@@ -1,12 +1,14 @@
 // FR-1 Open: file picker, drag-and-drop, "Open with", clear errors,
 // password prompt. Includes the Phase 1 gate: every corpus file opens or
 // shows a clear error.
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { openErrorMessage } from '../../src/lib/errors';
 import {
   corpus,
   corpusPath,
+  realWorldCorpus,
   expectDocumentOpen,
   gotoApp,
   isMobile,
@@ -124,6 +126,14 @@ test.describe('Phase 1 gate: every corpus file opens or shows a clear error', ()
         await expect(page.getByTestId('empty-state')).toBeVisible();
       }
     });
+  }
+});
+
+test('real-world corpus files are the checked blank copies', () => {
+  for (const entry of realWorldCorpus) {
+    const hash = createHash('sha256').update(readFileSync(corpusPath(entry.file))).digest('hex');
+    expect(hash, `${entry.file} changed since it was checked; re-check it is blank`).toBe(entry.sha256);
+    expect(entry.source, `${entry.file} needs a source`).toBeTruthy();
   }
 });
 

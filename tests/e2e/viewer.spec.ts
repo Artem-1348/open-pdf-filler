@@ -217,6 +217,13 @@ test.describe('search', () => {
     await expect(page.getByTestId('search-status')).toHaveText('1 of 1');
   });
 
+  test('finds text in a real government form', async ({ page }) => {
+    await open(page, 'irs-w9-2024-03.pdf');
+    await search(page, 'Taxpayer Identification');
+    await expect(page.getByTestId('search-status')).toHaveText(/^1 of \d+$/);
+    await expect.poll(() => currentPageNumber(page)).toBe(1);
+  });
+
   test('reports when nothing matches', async ({ page }) => {
     await open(page, 'twenty-pages.pdf');
     await search(page, 'haystack');
