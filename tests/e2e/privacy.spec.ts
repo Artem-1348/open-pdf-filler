@@ -1,6 +1,6 @@
 // NFR-1 Privacy: document bytes never leave the device. The network log over
-// a full session (open, password, search, zoom, errors) must show only GET
-// requests for the app's own files.
+// a full session (open, password, search, zoom, errors, fill, sign, save)
+// must show only GET requests for the app's own files.
 import { expect, test, type Request } from '@playwright/test';
 import { corpusEntry, expectDocumentOpen, gotoApp, openCorpusFile } from './helpers';
 
@@ -27,6 +27,20 @@ test('no document bytes leave the device during a full session', async ({ page, 
 
   await openCorpusFile(page, 'damaged-garbage.pdf');
   await expect(page.getByTestId('error')).toBeVisible();
+
+  // Fill, sign and save a copy (Phase 2): saving happens on the device too.
+  await openCorpusFile(page, 'all-field-types.pdf');
+  await expectDocumentOpen(page, 3);
+  await page.locator('[data-field="name_p0"]').fill('Иван Private');
+  await page.getByTestId('tool-sign').click();
+  await page.getByTestId('sig-tab-type').click();
+  await page.getByTestId('sig-typed-input').fill('Private Signature');
+  await page.getByTestId('sig-use').click();
+  await page.locator('[data-page-index="0"] [data-testid="placement-surface"]').click({ position: { x: 200, y: 300 } });
+  await page.getByTestId('save-button').click();
+  const download = page.waitForEvent('download');
+  await page.getByTestId('save-confirm').click();
+  await download;
 
   const origin = new URL(baseURL!).origin;
   const report = requests.map((r) => `${r.method()} ${r.url()}`);

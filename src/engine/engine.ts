@@ -93,6 +93,7 @@ export interface FormInfo {
   // PDFium's own field drawing so the editor's controls replace it.
   pagesWithFields: ReadonlySet<number>;
   canEdit: boolean;
+  permissions: number;
 }
 
 export async function readForm(doc: PdfDocumentObject): Promise<FormInfo> {
@@ -116,5 +117,5 @@ export async function readForm(doc: PdfDocumentObject): Promise<FormInfo> {
     permissions === -1 ||
     (permissions & PdfPermissionFlag.FillForms) !== 0 ||
     (permissions & PdfPermissionFlag.ModifyAnnotations) !== 0;
-  return { fields, pagesWithFields, canEdit };
+  return { fields, pagesWithFields, canEdit, permissions };
 }

@@ -223,7 +223,12 @@ await (async () => {
   const page = doc.addPage(SIZES.letter);
   heading(page, bold, 'Secret document');
   body(page, font, ['You opened the password-protected file.']);
-  doc.encrypt({ userPassword: 'open-sesame', ownerPassword: 'owner-secret' });
+  // Everything allowed once opened, so the app can fill it (Phase 2).
+  doc.encrypt({
+    userPassword: 'open-sesame',
+    ownerPassword: 'owner-secret',
+    permissions: { printing: 'highResolution', modifying: true, copying: true, annotating: true, fillingForms: true, contentAccessibility: true, documentAssembly: true },
+  });
   write('password-protected.pdf', await doc.save(), {
     expect: 'password',
     password: 'open-sesame',
@@ -240,6 +245,20 @@ await (async () => {
   body(page, font, ['Anyone can open this; only the owner may change it.']);
   doc.encrypt({ ownerPassword: 'owner-secret', permissions: { printing: 'lowResolution', modifying: false } });
   write('owner-password-only.pdf', await doc.save(), { expect: 'open', pages: 1, note: 'encrypted, empty user password' });
+})();
+
+// 9b. Opens without a password, but its permissions forbid filling it in.
+await (async () => {
+  const { doc, font, bold } = await newDoc('No filling allowed');
+  const page = doc.addPage(SIZES.letter);
+  heading(page, bold, 'Filling not permitted');
+  page.drawText('Name', { x: 72, y: 660, size: 12, font });
+  doc.getForm().createTextField('locked_name').addToPage(page, { x: 180, y: 652, width: 300, height: 24 });
+  doc.encrypt({
+    ownerPassword: 'owner-secret',
+    permissions: { printing: 'highResolution', modifying: false, copying: true, annotating: false, fillingForms: false, contentAccessibility: true, documentAssembly: false },
+  });
+  write('no-fill-permission.pdf', await doc.save(), { expect: 'open', pages: 1, note: 'permissions forbid filling and annotating' });
 })();
 
 // 10. Junk before the header (seen in files from some email gateways).

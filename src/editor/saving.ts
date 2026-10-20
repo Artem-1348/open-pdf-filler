@@ -8,6 +8,7 @@ import type { FieldValue, FormFieldInfo, PlacedItem } from '../pdf/model';
 export interface SaveInput {
   file: Blob;
   password?: string;
+  permissions?: number;
   fields: FormFieldInfo[];
   values: Map<string, FieldValue>;
   items: PlacedItem[];
@@ -19,12 +20,19 @@ export async function saveCopy(input: SaveInput): Promise<Uint8Array> {
   return savePdf({
     original: new Uint8Array(await input.file.arrayBuffer()),
     password: input.password,
+    permissions: input.permissions,
     fields: input.fields,
     values: input.values,
     items: input.items,
     flatten: input.flatten,
     loadFont,
   });
+}
+
+// Reads field details PDFium doesn't report, such as maximum lengths.
+export async function loadFieldExtras(file: Blob, password?: string) {
+  const { readFieldExtras } = await import('../pdf/writer');
+  return readFieldExtras(new Uint8Array(await file.arrayBuffer()), password);
 }
 
 async function loadFont(file: FontFile): Promise<Uint8Array> {

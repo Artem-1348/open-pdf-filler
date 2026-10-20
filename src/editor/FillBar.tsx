@@ -40,15 +40,15 @@ export function FillBar({ dirty, onSignature, onSave }: Props) {
           <SignIcon />
         </ToolButton>
       </div>
+      {!state.canEdit && (
+        <p className="fill-notice" role="status" data-testid="no-edit-notice">
+          This PDF's permissions don't allow filling it in, so it's read-only here.
+        </p>
+      )}
       <div className="toolbar-group">
         {state.tool && (
           <span className="tool-hint floating" role="status" data-testid="tool-hint">
             {state.tool.kind === 'text' ? 'Tap where the text should start' : 'Tap the page to place it'}
-          </span>
-        )}
-        {!state.canEdit && (
-          <span className="tool-hint" role="status" data-testid="no-edit-notice">
-            This PDF's permissions don't allow filling it in.
           </span>
         )}
         <button type="button" className={dirty ? 'btn primary' : 'btn'} onClick={onSave} data-testid="save-button">

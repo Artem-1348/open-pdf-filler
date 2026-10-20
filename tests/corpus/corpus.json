@@ -85,6 +85,12 @@
       "note": "encrypted, empty user password"
     },
     {
+      "file": "no-fill-permission.pdf",
+      "expect": "open",
+      "pages": 1,
+      "note": "permissions forbid filling and annotating"
+    },
+    {
       "file": "leading-junk.pdf",
       "expect": "open",
       "pages": 1,

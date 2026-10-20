@@ -642,6 +642,14 @@ select {
   white-space: nowrap;
 }
 
+.fill-notice {
+  order: 3;
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
 .btn.danger {
   background: var(--danger);
   border-color: var(--danger);
@@ -726,12 +734,22 @@ select.field-control {
 
 .item {
   position: absolute;
+  z-index: 1;
   pointer-events: auto;
   color: var(--ink);
   cursor: grab;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* A bigger invisible grab area, so small items (a checkmark at phone zoom
+   is ~10px) are easy to touch. Sits behind the item's own content. */
+.item::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  z-index: -1;
 }
 
 .item.selected {
@@ -813,8 +831,9 @@ select.field-control {
 
 .resize-handle {
   position: absolute;
-  right: -9px;
-  bottom: -9px;
+  /* Just outside the corner so it never covers a small item. */
+  right: -22px;
+  bottom: -22px;
   width: 18px;
   height: 18px;
   border: 2px solid var(--surface);
@@ -822,6 +841,12 @@ select.field-control {
   background: var(--item-outline);
   cursor: nwse-resize;
   touch-action: none;
+}
+
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
 }
 
 .placement-surface {
@@ -963,7 +988,11 @@ select.field-control {
   }
 
   .fillbar {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+  }
+
+  .fillbar .tools {
+    flex: 1;
   }
 
   .fillbar .btn {

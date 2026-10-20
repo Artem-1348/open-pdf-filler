@@ -5,6 +5,7 @@ import {
   PDFDict,
   PDFDocument,
   PDFName,
+  PDFTextField,
   StandardFonts,
   degrees,
   rgb,
@@ -30,6 +31,8 @@ export type FontFile = 'regular' | 'italic';
 export interface SaveRequest {
   original: Uint8Array;
   password?: string;
+  // The original's permission bits (PDF /P), kept when re-encrypting.
+  permissions?: number;
   fields: ReadonlyArray<FormFieldInfo>;
   // Only fields whose value the user changed.
   values: ReadonlyMap<string, FieldValue>;
@@ -93,7 +96,11 @@ export async function savePdf(req: SaveRequest): Promise<Uint8Array> {
 
   if (req.password) {
     // Keep the saved copy protected with the same open password (design D6).
-    doc.encrypt({ userPassword: req.password, ownerPassword: randomPassword() });
+    doc.encrypt({
+      userPassword: req.password,
+      ownerPassword: randomPassword(),
+      permissions: permissionsFromBits(req.permissions),
+    });
   }
 
   return doc.save();
@@ -118,10 +125,15 @@ async function fillFields(doc: PDFDocument, req: SaveRequest, frames: PageFrame[
     }
 
     switch (value.kind) {
-      case 'text':
-        form.getTextField(name).setText(value.text);
+      case 'text': {
+        const textField = form.getTextField(name);
+        // The editor enforces the limit; this only guards against pdf-lib
+        // refusing the whole save over one over-long value.
+        const max = textField.getMaxLength();
+        textField.setText(max !== undefined ? value.text.slice(0, max) : value.text);
         textChanged = true;
         break;
+      }
       case 'choice':
         if (info.kind === 'combo') {
           const dropdown = form.getDropdown(name);
@@ -341,6 +353,35 @@ function frameOf(page: PDFPage): PageFrame {
     height: box.height,
     rotation: normalizeRotation(page.getRotation().angle),
   };
+}
+
+// PDF permission bits (ISO 32000 table 22) to pdf-lib's options. Unknown or
+// unencrypted (-1) means everything is allowed.
+function permissionsFromBits(bits: number | undefined) {
+  const all = bits === undefined || bits === -1 || bits >>> 0 === 0xffffffff;
+  const has = (bit: number) => all || ((bits! >>> 0) & bit) !== 0;
+  return {
+    printing: has(4) ? (has(2048) ? ('highResolution' as const) : ('lowResolution' as const)) : false,
+    modifying: has(8),
+    copying: has(16),
+    annotating: has(32),
+    fillingForms: has(256),
+    contentAccessibility: has(512),
+    documentAssembly: has(1024),
+  };
+}
+
+// Field details PDFium doesn't report (currently the maximum text length).
+export async function readFieldExtras(original: Uint8Array, password?: string): Promise<Map<string, { maxLen?: number }>> {
+  const doc = await PDFDocument.load(original, { password, updateMetadata: false, preserveXFA: true });
+  const out = new Map<string, { maxLen?: number }>();
+  for (const field of doc.getForm().getFields()) {
+    if (field instanceof PDFTextField) {
+      const maxLen = field.getMaxLength();
+      if (maxLen !== undefined) out.set(field.getName(), { maxLen });
+    }
+  }
+  return out;
 }
 
 function randomPassword(): string {

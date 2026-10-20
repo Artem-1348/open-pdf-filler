@@ -25,7 +25,7 @@ import { FillBar } from './editor/FillBar';
 import { SaveDialog, type SaveChoice } from './editor/SaveDialog';
 import { SignatureDialog } from './editor/SignatureDialog';
 import { savedFileName } from './editor/fileName';
-import { downloadBytes, isSaveError, saveCopy } from './editor/saving';
+import { downloadBytes, isSaveError, loadFieldExtras, saveCopy } from './editor/saving';
 import { changedValues, editorReducer, emptyEditor, hasUnsavedChanges, meaningfulItems } from './editor/state';
 import type { SignatureContent } from './pdf/model';
 
@@ -144,6 +144,13 @@ export default function App() {
     const { doc: nextDoc, fileName, form } = next;
     setCurrent(next);
     dispatch({ type: 'reset', fields: form.fields, canEdit: form.canEdit });
+    if (form.fields.some((f) => f.kind === 'text')) {
+      void loadFieldExtras(next.file, next.password)
+        .then((extras) => {
+          if (currentRef.current?.doc === nextDoc) dispatch({ type: 'enrich-fields', maxLen: extras });
+        })
+        .catch(() => undefined);
+    }
     setCurrentPage(0);
     setZoomMode('fit-width');
     setError(null);
@@ -356,6 +363,7 @@ export default function App() {
       const bytes = await saveCopy({
         file: current.file,
         password: current.password,
+        permissions: current.form.permissions,
         fields: editor.fields,
         values: changedValues(editor),
         items: meaningfulItems(editor.items),

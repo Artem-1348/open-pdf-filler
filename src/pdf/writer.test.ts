@@ -13,7 +13,7 @@ import {
 } from '../../tests/support/pdfium-node';
 import type { FieldValue, FormFieldInfo, PlacedItem } from './model';
 import { savedFileName } from '../editor/fileName';
-import { SaveError, savePdf, type FontFile } from './writer';
+import { SaveError, readFieldExtras, savePdf, type FontFile } from './writer';
 
 const corpus = (name: string) => new Uint8Array(readFileSync(`tests/corpus/${name}`));
 const loadFont = async (f: FontFile) =>
@@ -246,6 +246,31 @@ describe('safety', () => {
     await expect(openWithPdfium(bytes)).rejects.toMatchObject({ reason: { code: PdfErrorCode.Password } });
     const doc = await openWithPdfium(bytes, password);
     expect(await pageText(doc, 0)).toContain('Still secret');
+  });
+
+  it('keeps the original permissions when re-encrypting', async () => {
+    const password = 'open-sesame';
+    const { bytes } = await save('password-protected.pdf', { password, items: [item({ kind: 'check', page: 0 })] });
+    const { pdfium } = await import('../../tests/support/pdfium-node');
+    const e = await pdfium();
+    const before = await e.getDocUserPermissions(await openWithPdfium(corpus('password-protected.pdf'), password)).toPromise();
+    const after = await e.getDocUserPermissions(await openWithPdfium(bytes, password)).toPromise();
+    // Fill forms (256) and annotate (32) must survive, or other apps would lock the copy.
+    expect(after & 256).toBe(before & 256);
+    expect(after & 32).toBe(before & 32);
+    expect(after & 256).not.toBe(0);
+  });
+
+  it('never writes more than a field’s maximum length', async () => {
+    const { bytes } = await save('all-field-types.pdf', { values: { pin: text('123456') } });
+    const { fields } = await readFieldsWithPdfium(bytes);
+    expect(byName(fields, 'pin').initial).toEqual(text('1234'));
+  });
+
+  it('reads maximum lengths PDFium does not report', async () => {
+    const extras = await readFieldExtras(corpus('all-field-types.pdf'));
+    expect(extras.get('pin')).toEqual({ maxLen: 4 });
+    expect(extras.has('name_p0')).toBe(false);
   });
 
   it('never changes the original bytes', async () => {
