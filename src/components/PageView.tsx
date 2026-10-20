@@ -2,6 +2,7 @@ import { memo } from 'react';
 import type { PdfDocumentObject, PdfPageObject, SearchResult } from '../engine/engine';
 import { useRenderedImage } from '../engine/useRenderedImage';
 import type { PageBox } from '../lib/layout';
+import { bitmapDpr } from '../lib/zoom';
 
 interface Props {
   doc: PdfDocumentObject;
@@ -24,7 +25,13 @@ export const PageView = memo(function PageView({
   matches,
   activeMatch,
 }: Props) {
-  const url = useRenderedImage({ doc, page, scaleFactor: scale, dpr, active: near });
+  const url = useRenderedImage({
+    doc,
+    page,
+    scaleFactor: scale,
+    dpr: bitmapDpr(box.width, box.height, dpr),
+    active: near,
+  });
   const label = `Page ${page.index + 1} of ${doc.pageCount}`;
 
   return (

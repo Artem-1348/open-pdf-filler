@@ -40,3 +40,21 @@ export function cssScale(percent: number): number {
 export function renderDpr(devicePixelRatio: number): number {
   return Math.min(Math.max(devicePixelRatio || 1, 1), 2);
 }
+
+// Safari (macOS and iOS) refuses canvases above 16,777,216 pixels and the
+// render silently fails, so a page's bitmap is kept under that budget. At
+// extreme zoom the page renders at a slightly lower density instead.
+export const MAX_BITMAP_PIXELS = 16_777_216;
+
+export function bitmapDpr(
+  cssWidth: number,
+  cssHeight: number,
+  dpr: number,
+  maxPixels = MAX_BITMAP_PIXELS,
+): number {
+  const area = cssWidth * cssHeight;
+  if (area <= 0) return dpr;
+  const limit = Math.sqrt(maxPixels / area);
+  // Small safety margin for PDFium rounding the bitmap size up.
+  return Math.min(dpr, limit * 0.99);
+}
