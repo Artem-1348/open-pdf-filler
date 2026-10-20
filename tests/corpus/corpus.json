@@ -1,0 +1,130 @@
+{
+  "files": [
+    {
+      "file": "simple.pdf",
+      "expect": "open",
+      "pages": 1,
+      "note": "single Letter page"
+    },
+    {
+      "file": "twenty-pages.pdf",
+      "expect": "open",
+      "pages": 20,
+      "search": {
+        "term": "needle",
+        "matches": 4,
+        "pages": [
+          3,
+          7,
+          7,
+          15
+        ]
+      },
+      "note": "NFR-3 timing file; search fixture"
+    },
+    {
+      "file": "long-120-pages.pdf",
+      "expect": "open",
+      "pages": 120,
+      "note": "100+ pages"
+    },
+    {
+      "file": "rotated.pdf",
+      "expect": "open",
+      "pages": 4,
+      "rotations": [
+        0,
+        90,
+        180,
+        270
+      ],
+      "note": "/Rotate 0, 90, 180, 270"
+    },
+    {
+      "file": "mixed-sizes.pdf",
+      "expect": "open",
+      "pages": 5,
+      "note": "Letter, A4, Legal, Tabloid landscape, A6"
+    },
+    {
+      "file": "fillable-form.pdf",
+      "expect": "open",
+      "pages": 1,
+      "note": "text, checkbox, radio, dropdown fields"
+    },
+    {
+      "file": "accented-text.pdf",
+      "expect": "open",
+      "pages": 1,
+      "search": {
+        "term": "Straße",
+        "matches": 1,
+        "pages": [
+          1
+        ]
+      },
+      "note": "French, German, Spanish, Portuguese, Danish text"
+    },
+    {
+      "file": "password-protected.pdf",
+      "expect": "password",
+      "password": "open-sesame",
+      "pages": 1,
+      "note": "user password \"open-sesame\" (AES-256)"
+    },
+    {
+      "file": "owner-password-only.pdf",
+      "expect": "open",
+      "pages": 1,
+      "note": "encrypted, empty user password"
+    },
+    {
+      "file": "leading-junk.pdf",
+      "expect": "open",
+      "pages": 1,
+      "note": "29 bytes before %PDF-"
+    },
+    {
+      "file": "broken-xref.pdf",
+      "expect": "open",
+      "pages": 1,
+      "note": "wrong startxref offset"
+    },
+    {
+      "file": "image-only.pdf",
+      "expect": "open",
+      "pages": 1,
+      "note": "no text layer, like a scan"
+    },
+    {
+      "file": "damaged-truncated.pdf",
+      "expect": "error",
+      "error": "damaged",
+      "note": "first 30% of a valid file"
+    },
+    {
+      "file": "damaged-garbage.pdf",
+      "expect": "error",
+      "error": "damaged",
+      "note": "valid header, random body"
+    },
+    {
+      "file": "not-a-pdf.pdf",
+      "expect": "error",
+      "error": "not-pdf",
+      "note": "a PNG renamed to .pdf"
+    },
+    {
+      "file": "notes.txt",
+      "expect": "error",
+      "error": "not-pdf",
+      "note": "plain text file"
+    },
+    {
+      "file": "empty.pdf",
+      "expect": "error",
+      "error": "empty",
+      "note": "0 bytes"
+    }
+  ]
+}

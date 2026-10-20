@@ -1,0 +1,26 @@
+name: Feature idea
+description: Suggest something new
+labels: [idea]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The project works in phases (see the roadmap). New ideas go to the backlog and are
+        scheduled between phases, not added to the phase in progress.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the problem, not just the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: This idea works without uploading documents to a server

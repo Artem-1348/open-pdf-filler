@@ -1,0 +1,42 @@
+{
+  "name": "open-pdf-filler",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Open, read and fill PDFs in your browser. Nothing is uploaded.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Artem-1348/open-pdf-filler.git"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:all": "npm run lint && npm test && npm run test:e2e",
+    "corpus": "node scripts/make-corpus.mjs",
+    "icons": "node scripts/make-icons.mjs"
+  },
+  "dependencies": {
+    "@embedpdf/engines": "^2.15.1",
+    "@embedpdf/models": "^2.15.1",
+    "@embedpdf/pdfium": "^2.15.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@cantoo/pdf-lib": "^2.11.1",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "oxlint": "^1.88.0",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5"
+  }
+}

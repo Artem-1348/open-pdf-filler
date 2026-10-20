@@ -1,0 +1,49 @@
+name: Bug report
+description: Something doesn't work the way it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Please don't attach PDFs that contain personal information.**
+        If a specific file triggers the bug, try to reproduce it with a blank or made-up copy.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: Chrome 141, Safari 26, Firefox 144 ...
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and operating system
+      placeholder: MacBook Air (macOS 26), Pixel 8 (Android 16), iPhone 15 (iOS 26) ...
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: How bad is it?
+      options:
+        - P1 — data loss, crash, or a document leaves the device
+        - P2 — a feature doesn't work and there's no workaround
+        - P3 — annoying, but there's a workaround
+        - P4 — cosmetic
+    validations:
+      required: true
