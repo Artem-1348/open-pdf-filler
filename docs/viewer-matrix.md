@@ -47,5 +47,8 @@ Real devices available for manual passes (fill in at the Phase 0 gate):
 
 | Device | OS version | Browser(s) | Owner |
 | --- | --- | --- | --- |
-| Laptop: | | | |
-| Phone: | | | |
+| MacBook Air (M3, 16 GB) | macOS 15.6.1 | Chromium 152 (Claude desktop browser pane); Playwright Chromium, Firefox, WebKit | Artem-1348 |
+| iPhone 17 Pro Max | iOS 27.0.1 | Safari | Artem-1348 |
+
+Still needed for the Phase 2 matrix: an Android phone, a Windows PC, and a Linux machine
+(or volunteers who have them).
