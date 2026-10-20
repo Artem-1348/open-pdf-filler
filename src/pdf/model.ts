@@ -13,6 +13,8 @@ export interface WidgetInfo {
 
 export interface FormFieldInfo {
   name: string;
+  // Human-readable label: the field's tooltip (/TU) if it has one.
+  label: string;
   kind: FieldKind;
   widgets: WidgetInfo[];
   options: string[];

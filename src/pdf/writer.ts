@@ -22,6 +22,7 @@ import {
   type Box,
   type PageFrame,
 } from './geometry';
+import { BASELINE_RATIO, TEXT_LINE_HEIGHT, TEXT_PADDING } from './layout';
 import { textsIn, type FieldValue, type FormFieldInfo, type PlacedItem } from './model';
 
 export type FontFile = 'regular' | 'italic';
@@ -47,11 +48,6 @@ export class SaveError extends Error {
   }
 }
 
-// Layout constants shared with the on-screen editor so saved text lands where
-// it was shown.
-export const TEXT_LINE_HEIGHT = 1.2;
-export const TEXT_PADDING = 2;
-const BASELINE_RATIO = 0.9;
 
 const CHECK_PATH = 'M4 12.5 L9.5 18 L20 6';
 const CROSS_PATH = 'M6 6 L18 18 M18 6 L6 18';
@@ -231,7 +227,8 @@ async function drawItem(page: PDFPage, frame: PageFrame, item: PlacedItem, fonts
         scale,
         rotate,
         borderColor: ink,
-        borderWidth: 2.6 * scale,
+        // pdf-lib scales the stroke along with the path.
+        borderWidth: 2.6,
         borderLineCap: 1, // round
       });
       break;
@@ -350,10 +347,4 @@ function randomPassword(): string {
   const bytes = new Uint8Array(24);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-// Suggested file name for the saved copy; the original is never overwritten.
-export function savedFileName(original: string, flatten: boolean): string {
-  const base = original.replace(/\.pdf$/i, '') || 'document';
-  return `${base} (${flatten ? 'flattened' : 'filled'}).pdf`;
 }

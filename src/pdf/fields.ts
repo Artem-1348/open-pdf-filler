@@ -46,6 +46,7 @@ export function buildFields(widgetsByPage: ReadonlyArray<ReadonlyArray<PdfWidget
         const options = 'options' in w.field && Array.isArray(w.field.options) ? w.field.options : [];
         info = {
           name,
+          label: labelFor(w.field.alternateName, name),
           kind,
           widgets: [],
           options: options.map((o) => o.label),
@@ -82,6 +83,14 @@ export function buildFields(widgetsByPage: ReadonlyArray<ReadonlyArray<PdfWidget
     }
   }
   return [...byName.values()];
+}
+
+function labelFor(alternate: string | undefined, name: string): string {
+  const tooltip = alternate?.trim();
+  if (tooltip) return tooltip.length > 80 ? `${tooltip.slice(0, 77)}…` : tooltip;
+  // "topmostSubform[0].Page1[0].f1_01[0]" -> "f1_01"
+  const last = name.split('.').pop() ?? name;
+  return last.replace(/\[\d+\]$/, '').replace(/_/g, ' ');
 }
 
 function initialToggle(info: FormFieldInfo, value: string): number {

@@ -26,6 +26,9 @@ interface Props {
   activeMatch: SearchResult | null;
   onCurrentPageChange(index: number): void;
   onAvailableWidthChange(px: number): void;
+  pagesWithFields: ReadonlySet<number>;
+  // A press on the page or background (not on a placed item).
+  onBackgroundPointerDown(): void;
 }
 
 const EMPTY: ReadonlyArray<SearchResult> = [];
@@ -51,6 +54,8 @@ export function Viewer({
   activeMatch,
   onCurrentPageChange,
   onAvailableWidthChange,
+  pagesWithFields,
+  onBackgroundPointerDown,
 }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const scale = cssScale(zoomPercent);
@@ -178,6 +183,7 @@ export function Viewer({
       className="scroller"
       ref={scrollerRef}
       onScroll={handleScroll}
+      onPointerDown={onBackgroundPointerDown}
       data-testid="viewer"
       tabIndex={0}
       aria-label="Document pages"
@@ -194,6 +200,7 @@ export function Viewer({
             near={near.has(i)}
             matches={matchesByPage.get(i) ?? EMPTY}
             activeMatch={activeMatch?.pageIndex === i ? activeMatch : null}
+            hasFields={pagesWithFields.has(i)}
           />
         ))}
       </div>

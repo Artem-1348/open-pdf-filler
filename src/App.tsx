@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { ConfirmDialog } from './components/ConfirmDialog';
 import { PasswordDialog } from './components/PasswordDialog';
 import { SearchBar } from './components/SearchBar';
 import { Thumbnails } from './components/Thumbnails';
@@ -8,8 +9,10 @@ import { FileIcon } from './components/icons';
 import {
   closePdf,
   openPdf,
+  readForm,
   searchPdf,
   warmUpEngine,
+  type FormInfo,
   type PdfDocumentObject,
   type SearchResult,
 } from './engine/engine';
@@ -17,11 +20,25 @@ import { OpenError, openErrorMessage } from './lib/errors';
 import { wrapIndex } from './lib/search';
 import { fitWidthZoom, nextZoomStep, prevZoomStep, type ZoomMode } from './lib/zoom';
 import { listenForLaunchedFiles, takeSharedFile } from './openWith';
+import { EditorContext, groupFieldsByPage, type EditorApi } from './editor/EditorContext';
+import { FillBar } from './editor/FillBar';
+import { SaveDialog, type SaveChoice } from './editor/SaveDialog';
+import { SignatureDialog } from './editor/SignatureDialog';
+import { savedFileName } from './editor/fileName';
+import { downloadBytes, isSaveError, saveCopy } from './editor/saving';
+import { changedValues, editorReducer, emptyEditor, hasUnsavedChanges, meaningfulItems } from './editor/state';
+import type { SignatureContent } from './pdf/model';
 
 interface OpenDoc {
   doc: PdfDocumentObject;
   fileName: string;
+  // Kept in memory to build saved copies from; never written back.
+  file: File;
+  password?: string;
+  form: FormInfo;
 }
+
+const NO_PAGES: ReadonlySet<number> = new Set();
 
 interface SearchResults {
   query: string;
@@ -64,6 +81,15 @@ export default function App() {
   const activeMatchIndex = resultsCurrent ? results.active : -1;
   const searching = keyword !== '' && !resultsCurrent;
 
+  const [editor, dispatch] = useReducer(editorReducer, emptyEditor);
+  const [signatureRequest, setSignatureRequest] = useState<((s: SignatureContent | null) => void) | null>(null);
+  const [lastSignature, setLastSignature] = useState<SignatureContent | null>(null);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // An action waiting for "discard unsaved changes?" to be confirmed.
+  const [pendingDiscard, setPendingDiscard] = useState<(() => void) | null>(null);
+
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const viewerRef = useRef<ViewerHandle>(null);
@@ -78,6 +104,27 @@ export default function App() {
   }, [currentPage]);
 
   const doc = current?.doc ?? null;
+  const dirty = current !== null && hasUnsavedChanges(editor);
+  const dirtyRef = useRef(false);
+  useEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
+
+  // Runs `action` now, or after the user agrees to drop unsaved changes.
+  const guardUnsaved = useCallback((action: () => void) => {
+    if (dirtyRef.current) setPendingDiscard(() => action);
+    else action();
+  }, []);
+
+  // Browsers show their own "leave site?" prompt for this.
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
 
   const zoomPercent = useMemo(() => {
     if (zoomMode !== 'fit-width') return zoomMode;
@@ -91,16 +138,19 @@ export default function App() {
     setSearchOpen(false);
   };
 
-  const showDocument = useCallback((next: PdfDocumentObject, fileName: string) => {
+  const showDocument = useCallback((next: OpenDoc) => {
     const previous = currentRef.current;
     if (previous) void closePdf(previous.doc);
-    setCurrent({ doc: next, fileName });
+    const { doc: nextDoc, fileName, form } = next;
+    setCurrent(next);
+    dispatch({ type: 'reset', fields: form.fields, canEdit: form.canEdit });
     setCurrentPage(0);
     setZoomMode('fit-width');
     setError(null);
     resetSearch();
-    const pages = next.pageCount === 1 ? '1 page' : `${next.pageCount} pages`;
-    setStatus(`Opened ${fileName}, ${pages}.`);
+    const pages = nextDoc.pageCount === 1 ? '1 page' : `${nextDoc.pageCount} pages`;
+    const fields = form.fields.length ? `, ${form.fields.length} form field${form.fields.length === 1 ? '' : 's'}` : '';
+    setStatus(`Opened ${fileName}, ${pages}${fields}.`);
   }, []);
 
   // Closing frees the document in the worker; the app keeps no copy of it.
@@ -111,6 +161,7 @@ export default function App() {
     setLoadingName(null);
     void closePdf(previous.doc);
     setCurrent(null);
+    dispatch({ type: 'reset', fields: [], canEdit: true });
     setCurrentPage(0);
     setError(null);
     resetSearch();
@@ -124,12 +175,13 @@ export default function App() {
       setError(null);
       try {
         const opened = await openPdf(file, password);
+        const form = await readForm(opened);
         if (seq !== openSeq.current) {
           void closePdf(opened);
           return;
         }
         setPasswordRequest(null);
-        showDocument(opened, file.name);
+        showDocument({ doc: opened, fileName: file.name, file, password, form });
       } catch (e) {
         if (seq !== openSeq.current) return;
         const kind = e instanceof OpenError ? e.kind : 'unknown';
@@ -154,11 +206,11 @@ export default function App() {
   // Engine warm-up and "Open with" entry points.
   useEffect(() => {
     warmUpEngine();
-    listenForLaunchedFiles((file) => void openFile(file));
+    listenForLaunchedFiles((file) => guardUnsaved(() => void openFile(file)));
     void takeSharedFile().then((file) => {
-      if (file) void openFile(file);
+      if (file) guardUnsaved(() => void openFile(file));
     });
-  }, [openFile]);
+  }, [openFile, guardUnsaved]);
 
   // Drag and drop anywhere on the window.
   useEffect(() => {
@@ -186,7 +238,7 @@ export default function App() {
       depth = 0;
       setDragging(false);
       const file = e.dataTransfer?.files[0];
-      if (file) void openFile(file);
+      if (file) guardUnsaved(() => void openFile(file));
     };
     window.addEventListener('dragenter', onEnter);
     window.addEventListener('dragover', onOver);
@@ -198,7 +250,7 @@ export default function App() {
       window.removeEventListener('dragleave', onLeave);
       window.removeEventListener('drop', onDrop);
     };
-  }, [openFile]);
+  }, [openFile, guardUnsaved]);
 
   // Search runs in the worker; debounce so typing stays smooth.
   useEffect(() => {
@@ -271,6 +323,82 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [doc, zoomPercent]);
 
+  // ---- Fill & sign
+
+  const requestSignature = useCallback(
+    () =>
+      new Promise<SignatureContent | null>((resolve) => {
+        setSignatureRequest(() => (sig: SignatureContent | null) => {
+          setSignatureRequest(null);
+          if (sig) setLastSignature(sig);
+          resolve(sig);
+        });
+      }),
+    [],
+  );
+
+  const fieldsByPage = useMemo(() => groupFieldsByPage(editor.fields), [editor.fields]);
+  const editorApi = useMemo<EditorApi>(
+    () => ({ state: editor, dispatch, fieldsByPage, requestSignature }),
+    [editor, fieldsByPage, requestSignature],
+  );
+
+  const pickSignatureTool = async () => {
+    const signature = await requestSignature();
+    if (signature) dispatch({ type: 'set-tool', tool: { kind: 'signature', signature } });
+  };
+
+  const save = async ({ flatten }: SaveChoice) => {
+    if (!current) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const bytes = await saveCopy({
+        file: current.file,
+        password: current.password,
+        fields: editor.fields,
+        values: changedValues(editor),
+        items: meaningfulItems(editor.items),
+        flatten,
+      });
+      const name = savedFileName(current.fileName, flatten);
+      downloadBytes(bytes, name);
+      dispatch({ type: 'saved' });
+      setSaveOpen(false);
+      setStatus(`Saved ${name}.`);
+    } catch (e) {
+      const unsupported = await isSaveError(e);
+      setSaveError(
+        unsupported
+          ? `These characters can't be saved yet: ${unsupported.characters.join(' ')}. Remove them and try again.`
+          : 'Something went wrong while saving. Your changes are still here; try again.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Delete removes the selected item; Escape drops the tool or selection.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing = !!target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+      if (e.key === 'Escape' && !typing) {
+        if (editor.tool) dispatch({ type: 'set-tool', tool: null });
+        else if (editor.selectedId) dispatch({ type: 'select', id: null });
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && !typing && editor.selectedId) {
+        e.preventDefault();
+        dispatch({ type: 'remove-item', id: editor.selectedId });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [editor.tool, editor.selectedId]);
+
+  const onBackgroundPointerDown = useCallback(() => {
+    if (editor.selectedId && !editor.editingId) dispatch({ type: 'select', id: null });
+  }, [editor.selectedId, editor.editingId]);
+
   const onNarrowSelect = (index: number) => {
     goToPage(index);
     if (window.matchMedia(NARROW_QUERY).matches) setThumbnailsOpen(false);
@@ -286,8 +414,8 @@ export default function App() {
         zoomMode={zoomMode}
         thumbnailsOpen={thumbnailsOpen}
         searchOpen={searchOpen}
-        onOpenClick={() => fileInputRef.current?.click()}
-        onClose={closeDocument}
+        onOpenClick={() => guardUnsaved(() => fileInputRef.current?.click())}
+        onClose={() => guardUnsaved(closeDocument)}
         onToggleThumbnails={() => setThumbnailsOpen((v) => !v)}
         onToggleSearch={() => (searchOpen ? resetSearch() : openSearch())}
         onGoToPage={goToPage}
@@ -307,6 +435,12 @@ export default function App() {
           if (file) void openFile(file);
         }}
       />
+
+      {doc && (
+        <EditorContext.Provider value={editorApi}>
+          <FillBar dirty={dirty} onSignature={() => void pickSignatureTool()} onSave={() => setSaveOpen(true)} />
+        </EditorContext.Provider>
+      )}
 
       {searchOpen && doc && (
         <SearchBar
@@ -331,9 +465,9 @@ export default function App() {
         </div>
       )}
 
-      <main className="workspace">
+      <main className={editor.tool ? 'workspace placing' : 'workspace'}>
         {doc ? (
-          <>
+          <EditorContext.Provider value={editorApi}>
             {thumbnailsOpen && (
               <Thumbnails doc={doc} currentPage={currentPage} onSelect={onNarrowSelect} />
             )}
@@ -345,8 +479,10 @@ export default function App() {
               activeMatch={activeMatch}
               onCurrentPageChange={setCurrentPage}
               onAvailableWidthChange={setAvailableWidth}
+              pagesWithFields={current?.form.pagesWithFields ?? NO_PAGES}
+              onBackgroundPointerDown={onBackgroundPointerDown}
             />
-          </>
+          </EditorContext.Provider>
         ) : (
           <EmptyState onOpen={() => fileInputRef.current?.click()} />
         )}
@@ -379,6 +515,39 @@ export default function App() {
             setLoadingName(null);
             setPasswordRequest(null);
           }}
+        />
+      )}
+
+      {signatureRequest && <SignatureDialog previous={lastSignature} onDone={signatureRequest} />}
+
+      {saveOpen && current && (
+        <SaveDialog
+          fileNameFor={(flatten) => savedFileName(current.fileName, flatten)}
+          hasFields={editor.fields.length > 0}
+          passwordProtected={!!current.password}
+          busy={saving}
+          error={saveError}
+          onSave={(choice) => void save(choice)}
+          onCancel={() => {
+            setSaveOpen(false);
+            setSaveError(null);
+          }}
+        />
+      )}
+
+      {pendingDiscard && (
+        <ConfirmDialog
+          title="Discard your changes?"
+          message="You have changes that aren't saved. If you continue, they'll be lost."
+          confirmLabel="Discard changes"
+          onConfirm={() => {
+            const action = pendingDiscard;
+            setPendingDiscard(null);
+            dispatch({ type: 'saved' });
+            dirtyRef.current = false;
+            action();
+          }}
+          onCancel={() => setPendingDiscard(null)}
         />
       )}
 

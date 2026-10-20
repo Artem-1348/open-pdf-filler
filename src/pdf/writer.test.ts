@@ -12,7 +12,8 @@ import {
   readFieldsWithPdfium,
 } from '../../tests/support/pdfium-node';
 import type { FieldValue, FormFieldInfo, PlacedItem } from './model';
-import { SaveError, savePdf, savedFileName, type FontFile } from './writer';
+import { savedFileName } from '../editor/fileName';
+import { SaveError, savePdf, type FontFile } from './writer';
 
 const corpus = (name: string) => new Uint8Array(readFileSync(`tests/corpus/${name}`));
 const loadFont = async (f: FontFile) =>
