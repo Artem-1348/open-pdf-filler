@@ -18,7 +18,8 @@
     "test:e2e": "playwright test",
     "test:all": "npm run lint && npm test && npm run test:e2e",
     "corpus": "node scripts/make-corpus.mjs",
-    "icons": "node scripts/make-icons.mjs"
+    "icons": "node scripts/make-icons.mjs",
+    "test:live": "E2E_BASE_URL=https://artem-1348.github.io/open-pdf-filler/ playwright test"
   },
   "dependencies": {
     "@embedpdf/engines": "^2.15.1",

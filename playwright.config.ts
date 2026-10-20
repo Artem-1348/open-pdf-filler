@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 4173;
+// Set E2E_BASE_URL to run the suite against a deployed copy instead of a local
+// build, e.g. E2E_BASE_URL=https://artem-1348.github.io/open-pdf-filler/
+const REMOTE = process.env.E2E_BASE_URL;
 
 // End-to-end tests run against the production build (with its Content
 // Security Policy), served by `vite preview`.
@@ -12,7 +15,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'test-results/html' }]],
   outputDir: 'test-results/artifacts',
   use: {
-    baseURL: `http://localhost:${PORT}`,
+    baseURL: REMOTE ?? `http://localhost:${PORT}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -23,7 +26,7 @@ export default defineConfig({
     { name: 'mobile-chrome', use: { ...devices['Pixel 7'] } },
     { name: 'mobile-safari', use: { ...devices['iPhone 14'] } },
   ],
-  webServer: {
+  webServer: REMOTE ? undefined : {
     command: `npm run build && npm run preview -- --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,
