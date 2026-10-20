@@ -103,6 +103,20 @@ export default function App() {
     setStatus(`Opened ${fileName}, ${pages}.`);
   }, []);
 
+  // Closing frees the document in the worker; the app keeps no copy of it.
+  const closeDocument = () => {
+    const previous = currentRef.current;
+    if (!previous) return;
+    openSeq.current++;
+    setLoadingName(null);
+    void closePdf(previous.doc);
+    setCurrent(null);
+    setCurrentPage(0);
+    setError(null);
+    resetSearch();
+    setStatus(`Closed ${previous.fileName}.`);
+  };
+
   const openFile = useCallback(
     async (file: File, password?: string) => {
       const seq = ++openSeq.current;
@@ -273,6 +287,7 @@ export default function App() {
         thumbnailsOpen={thumbnailsOpen}
         searchOpen={searchOpen}
         onOpenClick={() => fileInputRef.current?.click()}
+        onClose={closeDocument}
         onToggleThumbnails={() => setThumbnailsOpen((v) => !v)}
         onToggleSearch={() => (searchOpen ? resetSearch() : openSearch())}
         onGoToPage={goToPage}

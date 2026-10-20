@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ZOOM_STEPS, type ZoomMode } from '../lib/zoom';
-import { MinusIcon, OpenIcon, PlusIcon, SearchIcon, SidebarIcon } from './icons';
+import { CloseIcon, MinusIcon, OpenIcon, PlusIcon, SearchIcon, SidebarIcon } from './icons';
 
 interface Props {
   fileName: string | null;
@@ -11,6 +11,7 @@ interface Props {
   thumbnailsOpen: boolean;
   searchOpen: boolean;
   onOpenClick(): void;
+  onClose(): void;
   onToggleThumbnails(): void;
   onToggleSearch(): void;
   onGoToPage(index: number): void;
@@ -47,6 +48,18 @@ export function Toolbar(props: Props) {
           <span className="file-name toolbar-title" title={fileName} data-testid="file-name">
             {fileName}
           </span>
+        )}
+        {hasDoc && (
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Close document"
+            title="Close document"
+            onClick={props.onClose}
+            data-testid="close-button"
+          >
+            <CloseIcon />
+          </button>
         )}
       </div>
 

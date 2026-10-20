@@ -82,6 +82,21 @@ test('opening a second file replaces the first', async ({ page }) => {
   await expectDocumentOpen(page, 1);
 });
 
+test('closing a document returns to the start screen', async ({ page }) => {
+  await openCorpusFile(page, 'twenty-pages.pdf');
+  await expectDocumentOpen(page, 20);
+  await page.getByRole('button', { name: 'Close document' }).click();
+  await expect(page.getByTestId('empty-state')).toBeVisible();
+  await expect(page.getByTestId('app')).toHaveAttribute('data-doc-pages', '0');
+  await expect(page.getByTestId('page')).toHaveCount(0);
+  await expect(page.getByTestId('close-button')).toHaveCount(0);
+  await expect(page.getByTestId('status')).toHaveText('Closed twenty-pages.pdf.');
+
+  // The same file can be opened again afterwards.
+  await openCorpusFile(page, 'twenty-pages.pdf');
+  await expectDocumentOpen(page, 20);
+});
+
 test('an error while a document is open keeps the document', async ({ page }) => {
   await openCorpusFile(page, 'simple.pdf');
   await expectDocumentOpen(page, 1);
