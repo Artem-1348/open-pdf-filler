@@ -65,4 +65,4 @@ No open P1 or P2 bugs.
 | No open P1/P2 bugs | ✅ |
 | One-page test report | ✅ this file |
 | Demo on a laptop and a phone | ✅ |
-| Tagged release v0.1 | Pending |
+| Tagged release v0.1 | ✅ v0.1.0 |
