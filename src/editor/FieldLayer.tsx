@@ -1,6 +1,7 @@
 // Editable HTML controls laid over a page's form fields. The page image is
 // rendered without PDFium's own field drawing, so these replace it.
 import { memo, type CSSProperties } from 'react';
+import { autoFieldFontSize } from '../pdf/layout';
 import type { FieldValue, FormFieldInfo } from '../pdf/model';
 import { initialBox, newItemId } from './state';
 import { useEditor, type FieldOnPage } from './EditorContext';
@@ -166,10 +167,11 @@ function FieldControl({ entry, scale }: { entry: FieldOnPage; scale: number }) {
   }
 }
 
-// Field font size in points: the form's own, or fitted to the box.
+// Field font size in points: the form's own, or the shared auto size.
 function fieldFontSize(field: FormFieldInfo, boxHeight: number): number {
   if (field.fontSize > 0) return field.fontSize;
-  return Math.max(6, Math.min(12, boxHeight * 0.65));
+  // Same auto size the writer uses for the saved appearance (layout.ts).
+  return autoFieldFontSize(field.multiline || field.kind === 'list' ? 18 : boxHeight);
 }
 
 // A signature centred in a signature field, keeping its proportions.

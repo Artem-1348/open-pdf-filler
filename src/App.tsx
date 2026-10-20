@@ -144,10 +144,10 @@ export default function App() {
     const { doc: nextDoc, fileName, form } = next;
     setCurrent(next);
     dispatch({ type: 'reset', fields: form.fields, canEdit: form.canEdit });
-    if (form.fields.some((f) => f.kind === 'text')) {
+    if (form.fields.some((f) => f.kind === 'text' || f.kind === 'combo' || f.kind === 'list')) {
       void loadFieldExtras(next.file, next.password)
         .then((extras) => {
-          if (currentRef.current?.doc === nextDoc) dispatch({ type: 'enrich-fields', maxLen: extras });
+          if (currentRef.current?.doc === nextDoc) dispatch({ type: 'enrich-fields', extras });
         })
         .catch(() => undefined);
     }

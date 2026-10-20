@@ -168,7 +168,9 @@ await (async () => {
     const s = `_p${angle}`;
     heading(page, bold, `Fields on a page rotated ${angle}`);
     page.drawText('Name', { x: 72, y: 660, size: 12, font });
-    form.createTextField(`name${s}`).addToPage(page, { x: 180, y: 652, width: 300, height: 24 });
+    const name = form.createTextField(`name${s}`);
+    name.addToPage(page, { x: 180, y: 652, width: 300, height: 24 });
+    name.setFontSize(12);
     page.drawText('Agree', { x: 72, y: 610, size: 12, font });
     form.createCheckBox(`agree${s}`).addToPage(page, { x: 180, y: 604, width: 18, height: 18 });
     if (angle !== 0) continue;
@@ -176,6 +178,9 @@ await (async () => {
     const notes = form.createTextField('notes');
     notes.enableMultiline();
     notes.addToPage(page, { x: 180, y: 500, width: 300, height: 72 });
+    // "Auto" font size (0), as many real forms use. pdf-lib's setFontSize(0)
+    // is ignored, so write the default appearance directly.
+    notes.acroField.setDefaultAppearance('0 0 0 rg\n/Helvetica 0 Tf');
     page.drawText('Size', { x: 72, y: 460, size: 12, font });
     const size = form.createRadioGroup('size');
     for (const [i, v] of ['small', 'medium', 'large'].entries()) {
@@ -185,17 +190,22 @@ await (async () => {
     const colour = form.createDropdown('colour');
     colour.addOptions(['Red', 'Green', 'Blue']);
     colour.addToPage(page, { x: 180, y: 402, width: 160, height: 24 });
+    colour.setFontSize(12);
     page.drawText('Toppings', { x: 72, y: 360, size: 12, font });
     const toppings = form.createOptionList('toppings');
     toppings.addOptions(['Cheese', 'Olives', 'Peppers', 'Onions']);
     toppings.enableMultiselect();
     toppings.addToPage(page, { x: 180, y: 290, width: 160, height: 80 });
+    toppings.setFontSize(11);
     page.drawText('PIN (4)', { x: 72, y: 250, size: 12, font });
     const pin = form.createTextField('pin');
     pin.setMaxLength(4);
     pin.addToPage(page, { x: 180, y: 242, width: 80, height: 24 });
+    pin.acroField.setDefaultAppearance('0 0 0 rg\n/Helvetica 0 Tf');
   }
-  write('all-field-types.pdf', await doc.save(), {
+  // updateFieldAppearances: false keeps the "auto" sizes; pdf-lib would
+  // otherwise bake its own computed size into them.
+  write('all-field-types.pdf', await doc.save({ updateFieldAppearances: false }), {
     expect: 'open',
     pages: 3,
     note: 'blank text, multiline, max-length, checkbox, radio, dropdown, multi-select list; rotated pages',

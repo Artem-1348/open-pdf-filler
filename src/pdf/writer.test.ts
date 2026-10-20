@@ -97,6 +97,15 @@ describe('filling existing fields', () => {
     expect(await inkInBox(reopened, 0, box)).toBeGreaterThan(50);
   });
 
+  it('draws auto-size multi-line text at a readable size, keeping every line', async () => {
+    const { bytes } = await save('all-field-types.pdf', { values: { notes: text('Line one\nLine two\nLine three') }, flatten: true });
+    const { doc } = await readFieldsWithPdfium(bytes);
+    const page = await pageText(doc, 0);
+    for (const line of ['Line one', 'Line two', 'Line three']) expect(page).toContain(line);
+    const [hit] = await findText(doc, 'Line one');
+    expect(hit.rects[0].size.height).toBeLessThan(16); // ~12pt, not blown up to the box
+  });
+
   it('turns on only the chosen radio', async () => {
     const { bytes } = await save('all-field-types.pdf', { values: { size: on(2) } });
     const doc = await PDFDocument.load(bytes);
@@ -267,10 +276,13 @@ describe('safety', () => {
     expect(byName(fields, 'pin').initial).toEqual(text('1234'));
   });
 
-  it('reads maximum lengths PDFium does not report', async () => {
+  it('reads maximum lengths and auto font sizes PDFium does not report', async () => {
     const extras = await readFieldExtras(corpus('all-field-types.pdf'));
-    expect(extras.get('pin')).toEqual({ maxLen: 4 });
-    expect(extras.has('name_p0')).toBe(false);
+    expect(extras.get('pin')).toEqual({ maxLen: 4, fontSize: 0 });
+    expect(extras.get('notes')).toEqual({ fontSize: 0 });
+    expect(extras.get('name_p0')).toEqual({ fontSize: 12 });
+    const w9 = await readFieldExtras(corpus('irs-w9-2024-03.pdf'));
+    expect(w9.get('topmostSubform[0].Page1[0].f1_01[0]')?.fontSize).toBeGreaterThan(0);
   });
 
   it('never changes the original bytes', async () => {

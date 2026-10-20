@@ -26,7 +26,7 @@ export interface EditorState {
 export type EditorAction =
   | { type: 'reset'; fields: FormFieldInfo[]; canEdit: boolean }
   | { type: 'set-value'; name: string; value: FieldValue }
-  | { type: 'enrich-fields'; maxLen: ReadonlyMap<string, { maxLen?: number }> }
+  | { type: 'enrich-fields'; extras: ReadonlyMap<string, { maxLen?: number; fontSize?: number }> }
   | { type: 'place'; item: PlacedItem }
   | { type: 'update-item'; id: string; patch: Partial<Omit<PlacedItem, 'id'>> }
   | { type: 'remove-item'; id: string }
@@ -58,8 +58,13 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return {
         ...state,
         fields: state.fields.map((f) => {
-          const extra = action.maxLen.get(f.name);
-          return extra?.maxLen !== undefined ? { ...f, maxLen: extra.maxLen } : f;
+          const extra = action.extras.get(f.name);
+          if (!extra) return f;
+          return {
+            ...f,
+            ...(extra.maxLen !== undefined ? { maxLen: extra.maxLen } : {}),
+            ...(extra.fontSize !== undefined ? { fontSize: extra.fontSize } : {}),
+          };
         }),
       };
     case 'set-value': {

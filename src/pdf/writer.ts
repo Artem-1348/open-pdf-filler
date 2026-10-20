@@ -4,7 +4,9 @@ import fontkit from '@cantoo/fontkit';
 import {
   PDFDict,
   PDFDocument,
+  PDFDropdown,
   PDFName,
+  PDFOptionList,
   PDFTextField,
   StandardFonts,
   degrees,
@@ -23,7 +25,7 @@ import {
   type Box,
   type PageFrame,
 } from './geometry';
-import { BASELINE_RATIO, TEXT_LINE_HEIGHT, TEXT_PADDING } from './layout';
+import { BASELINE_RATIO, TEXT_LINE_HEIGHT, TEXT_PADDING, autoFieldFontSize } from './layout';
 import { textsIn, type FieldValue, type FormFieldInfo, type PlacedItem } from './model';
 
 export type FontFile = 'regular' | 'italic';
@@ -103,7 +105,9 @@ export async function savePdf(req: SaveRequest): Promise<Uint8Array> {
     });
   }
 
-  return doc.save();
+  // Appearances were generated above with the right font; pdf-lib's default
+  // pass would redo them in Helvetica and bake "auto" font sizes into them.
+  return doc.save({ updateFieldAppearances: false });
 }
 
 // ---------------------------------------------------------------- fields
@@ -131,6 +135,7 @@ async function fillFields(doc: PDFDocument, req: SaveRequest, frames: PageFrame[
         // refusing the whole save over one over-long value.
         const max = textField.getMaxLength();
         textField.setText(max !== undefined ? value.text.slice(0, max) : value.text);
+        if (isAutoSize(textField)) textField.setFontSize(autoSizeFor(info));
         textChanged = true;
         break;
       }
@@ -139,10 +144,12 @@ async function fillFields(doc: PDFDocument, req: SaveRequest, frames: PageFrame[
           const dropdown = form.getDropdown(name);
           if (value.selected.length) dropdown.select(value.selected[0], info.editableCombo);
           else dropdown.clear();
+          if (isAutoSize(dropdown)) dropdown.setFontSize(autoSizeFor(info));
         } else {
           const list = form.getOptionList(name);
           if (value.selected.length) list.select(value.selected);
           else list.clear();
+          if (isAutoSize(list)) list.setFontSize(Math.min(autoSizeFor(info), 11));
         }
         textChanged = true;
         break;
@@ -157,6 +164,22 @@ async function fillFields(doc: PDFDocument, req: SaveRequest, frames: PageFrame[
     // fields themselves, like Preview and iOS (design D1).
     form.updateFieldAppearances(await fonts.forFields());
   }
+}
+
+// The font size in a field's default appearance ("/Helv 12 Tf"); 0 = auto.
+export function daFontSize(field: PDFField): number | undefined {
+  const da = field.acroField.getDefaultAppearance();
+  const match = da?.match(/(-?\d*\.?\d+)\s+Tf/);
+  return match ? Number(match[1]) : undefined;
+}
+
+const isAutoSize = (field: PDFField) => (daFontSize(field) ?? 0) === 0;
+
+// Auto-sized fields get the same size the editor showed (see layout.ts).
+function autoSizeFor(info: FormFieldInfo): number {
+  const heights = info.widgets.map((w) => w.box.height);
+  const height = info.kind === 'list' || info.multiline ? 18 : Math.min(...heights);
+  return autoFieldFontSize(height);
 }
 
 // Checkbox and radio: turn on exactly one widget (or none). The widget is
@@ -372,14 +395,26 @@ function permissionsFromBits(bits: number | undefined) {
 }
 
 // Field details PDFium doesn't report (currently the maximum text length).
-export async function readFieldExtras(original: Uint8Array, password?: string): Promise<Map<string, { maxLen?: number }>> {
+export interface FieldExtras {
+  maxLen?: number;
+  // From the default appearance; 0 = auto. PDFium reports a computed size.
+  fontSize?: number;
+}
+
+export async function readFieldExtras(original: Uint8Array, password?: string): Promise<Map<string, FieldExtras>> {
   const doc = await PDFDocument.load(original, { password, updateMetadata: false, preserveXFA: true });
-  const out = new Map<string, { maxLen?: number }>();
+  const out = new Map<string, FieldExtras>();
   for (const field of doc.getForm().getFields()) {
+    const extras: FieldExtras = {};
     if (field instanceof PDFTextField) {
       const maxLen = field.getMaxLength();
-      if (maxLen !== undefined) out.set(field.getName(), { maxLen });
+      if (maxLen !== undefined) extras.maxLen = maxLen;
     }
+    if (field instanceof PDFTextField || field instanceof PDFDropdown || field instanceof PDFOptionList) {
+      const size = daFontSize(field);
+      if (size !== undefined) extras.fontSize = size;
+    }
+    if (extras.maxLen !== undefined || extras.fontSize !== undefined) out.set(field.getName(), extras);
   }
   return out;
 }
