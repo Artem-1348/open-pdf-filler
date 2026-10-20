@@ -158,6 +158,50 @@ await (async () => {
   write('fillable-form.pdf', await doc.save(), { expect: 'open', pages: 1, note: 'text, checkbox, radio, dropdown fields' });
 })();
 
+// 6b. Every field type, blank, on upright and rotated pages (Phase 2 filling).
+await (async () => {
+  const { doc, font, bold } = await newDoc('All field types');
+  const form = doc.getForm();
+  for (const angle of [0, 90, 270]) {
+    const page = doc.addPage(SIZES.letter);
+    page.setRotation(degrees(angle));
+    const s = `_p${angle}`;
+    heading(page, bold, `Fields on a page rotated ${angle}`);
+    page.drawText('Name', { x: 72, y: 660, size: 12, font });
+    form.createTextField(`name${s}`).addToPage(page, { x: 180, y: 652, width: 300, height: 24 });
+    page.drawText('Agree', { x: 72, y: 610, size: 12, font });
+    form.createCheckBox(`agree${s}`).addToPage(page, { x: 180, y: 604, width: 18, height: 18 });
+    if (angle !== 0) continue;
+    page.drawText('Notes', { x: 72, y: 560, size: 12, font });
+    const notes = form.createTextField('notes');
+    notes.enableMultiline();
+    notes.addToPage(page, { x: 180, y: 500, width: 300, height: 72 });
+    page.drawText('Size', { x: 72, y: 460, size: 12, font });
+    const size = form.createRadioGroup('size');
+    for (const [i, v] of ['small', 'medium', 'large'].entries()) {
+      size.addOptionToPage(v, page, { x: 180 + i * 80, y: 454, width: 18, height: 18 });
+    }
+    page.drawText('Colour', { x: 72, y: 410, size: 12, font });
+    const colour = form.createDropdown('colour');
+    colour.addOptions(['Red', 'Green', 'Blue']);
+    colour.addToPage(page, { x: 180, y: 402, width: 160, height: 24 });
+    page.drawText('Toppings', { x: 72, y: 360, size: 12, font });
+    const toppings = form.createOptionList('toppings');
+    toppings.addOptions(['Cheese', 'Olives', 'Peppers', 'Onions']);
+    toppings.enableMultiselect();
+    toppings.addToPage(page, { x: 180, y: 290, width: 160, height: 80 });
+    page.drawText('PIN (4)', { x: 72, y: 250, size: 12, font });
+    const pin = form.createTextField('pin');
+    pin.setMaxLength(4);
+    pin.addToPage(page, { x: 180, y: 242, width: 80, height: 24 });
+  }
+  write('all-field-types.pdf', await doc.save(), {
+    expect: 'open',
+    pages: 3,
+    note: 'blank text, multiline, max-length, checkbox, radio, dropdown, multi-select list; rotated pages',
+  });
+})();
+
 // 7. Non-English Latin text.
 await (async () => {
   const { doc, font, bold } = await newDoc('Accented text');
