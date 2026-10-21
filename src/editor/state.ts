@@ -1,6 +1,15 @@
-// Editor state: field values and placed items for the open document.
+// Editor state: field values and placed items for the open document, plus
+// the form builder's drafts (Phase 3) and undo/redo.
 import { fieldValuesEqual, type FieldValue, type FormFieldInfo, type PlacedItem, type PlacedKind, type SignatureContent } from '../pdf/model';
 import type { Box } from '../pdf/geometry';
+import {
+  draftsFromFields,
+  fieldsFromDrafts,
+  sortByPageOrder,
+  type CreatableKind,
+  type DateFormat,
+  type FieldDraft,
+} from '../builder/model';
 
 export type Tool =
   | { kind: 'text' }
@@ -9,24 +18,62 @@ export type Tool =
   | { kind: 'cross' }
   | { kind: 'signature'; signature: SignatureContent };
 
+export type Mode = 'fill' | 'edit';
+
+interface Snapshot {
+  drafts: FieldDraft[] | null;
+  customOrder: boolean;
+  values: Map<string, FieldValue>;
+  items: PlacedItem[];
+}
+
+const HISTORY_LIMIT = 100;
+
 export interface EditorState {
+  // Fields as read from the PDF.
+  originalFields: FormFieldInfo[];
+  // The form's structure once the user edits it; null while untouched.
+  drafts: FieldDraft[] | null;
+  // The user reordered tabs by hand; otherwise drafts stay in page order.
+  customOrder: boolean;
+  // The fields Fill mode and the writer use: from drafts, or the originals.
   fields: FormFieldInfo[];
   canEdit: boolean;
+  mode: Mode;
   values: Map<string, FieldValue>;
   items: PlacedItem[];
   selectedId: string | null;
   // Item that should take keyboard focus for typing right after placement.
   editingId: string | null;
   tool: Tool | null;
+  // Edit form mode.
+  selection: string[];
+  buildTool: CreatableKind | null;
+  // Undo/redo. Consecutive edits with the same key (typing in one field,
+  // dragging one box) count as one step.
+  past: Snapshot[];
+  future: Snapshot[];
+  lastKey: string | null;
   // Snapshot at the last save, to tell whether there are unsaved changes.
   savedValues: Map<string, FieldValue>;
   savedItems: PlacedItem[];
+  savedDrafts: FieldDraft[] | null;
 }
+
+export interface FieldExtrasUpdate {
+  maxLen?: number;
+  fontSize?: number;
+  isDate?: boolean;
+  dateFormat?: DateFormat;
+  tooltip?: string;
+}
+
+export type DraftPatch = Partial<Omit<FieldDraft, 'id' | 'source'>>;
 
 export type EditorAction =
   | { type: 'reset'; fields: FormFieldInfo[]; canEdit: boolean }
   | { type: 'set-value'; name: string; value: FieldValue }
-  | { type: 'enrich-fields'; extras: ReadonlyMap<string, { maxLen?: number; fontSize?: number }> }
+  | { type: 'enrich-fields'; extras: ReadonlyMap<string, FieldExtrasUpdate> }
   | { type: 'place'; item: PlacedItem }
   | { type: 'update-item'; id: string; patch: Partial<Omit<PlacedItem, 'id'>> }
   | { type: 'remove-item'; id: string }
@@ -34,25 +81,106 @@ export type EditorAction =
   | { type: 'edit'; id: string }
   | { type: 'stop-editing' }
   | { type: 'set-tool'; tool: Tool | null }
+  | { type: 'set-mode'; mode: Mode }
+  | { type: 'set-build-tool'; tool: CreatableKind | null }
+  | { type: 'add-drafts'; drafts: FieldDraft[] }
+  // `key` groups a run of updates (e.g. one drag) into one undo step.
+  | { type: 'update-drafts'; patches: Array<{ id: string; patch: DraftPatch }>; key?: string }
+  | { type: 'remove-drafts'; ids: string[] }
+  | { type: 'reorder-drafts'; ids: string[] }
+  | { type: 'reset-order' }
+  | { type: 'select-drafts'; ids: string[] }
+  | { type: 'undo' }
+  | { type: 'redo' }
   | { type: 'saved' };
 
 export const emptyEditor: EditorState = {
+  originalFields: [],
+  drafts: null,
+  customOrder: false,
   fields: [],
   canEdit: true,
+  mode: 'fill',
   values: new Map(),
   items: [],
   selectedId: null,
   editingId: null,
   tool: null,
+  selection: [],
+  buildTool: null,
+  past: [],
+  future: [],
+  lastKey: null,
   savedValues: new Map(),
   savedItems: [],
+  savedDrafts: null,
 };
+
+const snapshot = (s: EditorState): Snapshot => ({
+  drafts: s.drafts,
+  customOrder: s.customOrder,
+  values: s.values,
+  items: s.items,
+});
+
+// Records the state before an edit, unless it continues the previous one.
+function record(state: EditorState, key: string | null): Pick<EditorState, 'past' | 'future' | 'lastKey'> {
+  if (key !== null && key === state.lastKey) return { past: state.past, future: [], lastKey: key };
+  const past = [...state.past, snapshot(state)].slice(-HISTORY_LIMIT);
+  return { past, future: [], lastKey: key };
+}
+
+function withDrafts(state: EditorState, drafts: FieldDraft[] | null, customOrder = state.customOrder): EditorState {
+  const ordered = drafts && !customOrder ? sortByPageOrder(drafts) : drafts;
+  const fields = ordered ? fieldsFromDrafts(ordered, state.originalFields) : state.originalFields;
+  return { ...state, drafts: ordered, customOrder, fields };
+}
+
+function restore(state: EditorState, snap: Snapshot): EditorState {
+  const next = withDrafts({ ...state, values: snap.values, items: snap.items }, snap.drafts, snap.customOrder);
+  const ids = new Set(next.drafts?.map((d) => d.id) ?? []);
+  const itemIds = new Set(next.items.map((i) => i.id));
+  return {
+    ...next,
+    selection: state.selection.filter((id) => ids.has(id)),
+    selectedId: state.selectedId && itemIds.has(state.selectedId) ? state.selectedId : null,
+    editingId: null,
+    lastKey: null,
+  };
+}
+
+// When a rename leaves an old name unused, its value follows the field.
+function migrateValues(
+  values: Map<string, FieldValue>,
+  before: ReadonlyArray<FieldDraft>,
+  after: ReadonlyArray<FieldDraft>,
+): Map<string, FieldValue> {
+  const stillUsed = new Set(after.map((d) => d.name));
+  let out = values;
+  for (const old of before) {
+    const now = after.find((d) => d.id === old.id);
+    if (!now || now.name === old.name || stillUsed.has(old.name)) continue;
+    const value = values.get(old.name);
+    if (value === undefined || values.has(now.name)) continue;
+    if (out === values) out = new Map(values);
+    out.set(now.name, value);
+    out.delete(old.name);
+  }
+  return out;
+}
 
 export function editorReducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
     case 'reset': {
       const values = new Map(action.fields.map((f) => [f.name, f.initial]));
-      return { ...emptyEditor, fields: action.fields, canEdit: action.canEdit, values, savedValues: values };
+      return {
+        ...emptyEditor,
+        originalFields: action.fields,
+        fields: action.fields,
+        canEdit: action.canEdit,
+        values,
+        savedValues: values,
+      };
     }
     case 'enrich-fields': {
       // A length limit can arrive after the user started typing; trim to it
@@ -64,28 +192,34 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
           values.set(name, { kind: 'text', text: v.text.slice(0, extra.maxLen) });
         }
       }
-      return {
-        ...state,
-        values,
-        fields: state.fields.map((f) => {
-          const extra = action.extras.get(f.name);
-          if (!extra) return f;
-          return {
-            ...f,
-            ...(extra.maxLen !== undefined ? { maxLen: extra.maxLen } : {}),
-            ...(extra.fontSize !== undefined ? { fontSize: extra.fontSize } : {}),
-          };
-        }),
-      };
+      const originalFields = state.originalFields.map((f) => {
+        const extra = action.extras.get(f.name);
+        return extra ? { ...f, ...definedOnly(extra) } : f;
+      });
+      const drafts = state.drafts?.map((d) => {
+        const extra = d.source && action.extras.get(d.source.name);
+        if (!extra) return d;
+        return {
+          ...d,
+          ...(extra.maxLen !== undefined ? { maxLen: extra.maxLen } : {}),
+          ...(extra.fontSize !== undefined ? { fontSize: extra.fontSize } : {}),
+          ...(extra.isDate ? { kind: 'date' as const } : {}),
+          ...(extra.dateFormat ? { dateFormat: extra.dateFormat } : {}),
+        };
+      }) ?? null;
+      const next = withDrafts({ ...state, originalFields, values }, drafts);
+      // Extras describe the file as opened; they aren't an unsaved change.
+      return { ...next, savedDrafts: state.drafts === state.savedDrafts ? next.drafts : state.savedDrafts };
     }
     case 'set-value': {
       const values = new Map(state.values);
       values.set(action.name, action.value);
-      return { ...state, values };
+      return { ...state, ...record(state, `value:${action.name}`), values };
     }
     case 'place':
       return {
         ...state,
+        ...record(state, null),
         items: [...state.items, action.item],
         selectedId: action.item.id,
         editingId: action.item.kind === 'text' ? action.item.id : null,
@@ -94,27 +228,97 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case 'update-item':
       return {
         ...state,
+        ...record(state, `item:${action.id}`),
         items: state.items.map((i) => (i.id === action.id ? { ...i, ...action.patch } : i)),
       };
     case 'remove-item':
       return {
         ...state,
+        ...record(state, null),
         items: state.items.filter((i) => i.id !== action.id),
         selectedId: state.selectedId === action.id ? null : state.selectedId,
         editingId: state.editingId === action.id ? null : state.editingId,
       };
     case 'select':
-      return { ...state, selectedId: action.id, editingId: action.id === state.editingId ? state.editingId : null };
+      return {
+        ...state,
+        selectedId: action.id,
+        editingId: action.id === state.editingId ? state.editingId : null,
+        lastKey: null,
+      };
     case 'edit':
       return { ...state, selectedId: action.id, editingId: action.id };
     case 'stop-editing':
-      return { ...state, editingId: null };
+      return { ...state, editingId: null, lastKey: null };
     case 'set-tool':
       return { ...state, tool: action.tool, selectedId: action.tool ? null : state.selectedId };
+    case 'set-mode': {
+      const base = { ...state, mode: action.mode, tool: null, buildTool: null, selection: [], selectedId: null, editingId: null };
+      if (action.mode === 'edit' && !state.drafts) {
+        // Entering Edit form turns the PDF's fields into drafts; this alone
+        // is not a change to the document.
+        const next = withDrafts(base, draftsFromFields(state.originalFields), false);
+        return { ...next, savedDrafts: state.savedDrafts === null ? next.drafts : state.savedDrafts };
+      }
+      return base;
+    }
+    case 'set-build-tool':
+      return { ...state, buildTool: action.tool, selection: action.tool ? [] : state.selection };
+    case 'add-drafts': {
+      const drafts = [...(state.drafts ?? []), ...action.drafts];
+      const next = withDrafts({ ...state, ...record(state, null) }, drafts);
+      return { ...next, selection: action.drafts.map((d) => d.id), buildTool: null };
+    }
+    case 'update-drafts': {
+      if (!state.drafts) return state;
+      const patches = new Map(action.patches.map((p) => [p.id, p.patch]));
+      const drafts = state.drafts.map((d) => {
+        const patch = patches.get(d.id);
+        return patch ? { ...d, ...patch } : d;
+      });
+      const values = migrateValues(state.values, state.drafts, drafts);
+      return withDrafts({ ...state, ...record(state, action.key ?? null), values }, drafts);
+    }
+    case 'remove-drafts': {
+      if (!state.drafts) return state;
+      const gone = new Set(action.ids);
+      const next = withDrafts({ ...state, ...record(state, null) }, state.drafts.filter((d) => !gone.has(d.id)));
+      return { ...next, selection: state.selection.filter((id) => !gone.has(id)) };
+    }
+    case 'reorder-drafts': {
+      if (!state.drafts) return state;
+      const byId = new Map(state.drafts.map((d) => [d.id, d]));
+      const ordered = action.ids.map((id) => byId.get(id)).filter((d): d is FieldDraft => !!d);
+      const rest = state.drafts.filter((d) => !action.ids.includes(d.id));
+      return withDrafts({ ...state, ...record(state, null) }, [...ordered, ...rest], true);
+    }
+    case 'reset-order':
+      return withDrafts({ ...state, ...record(state, null) }, state.drafts, false);
+    case 'select-drafts':
+      return { ...state, selection: action.ids, lastKey: null };
+    case 'undo': {
+      const prev = state.past[state.past.length - 1];
+      if (!prev) return state;
+      const restored = restore(state, prev);
+      return { ...restored, past: state.past.slice(0, -1), future: [snapshot(state), ...state.future] };
+    }
+    case 'redo': {
+      const next = state.future[0];
+      if (!next) return state;
+      const restored = restore(state, next);
+      return { ...restored, past: [...state.past, snapshot(state)], future: state.future.slice(1) };
+    }
     case 'saved':
-      return { ...state, savedValues: state.values, savedItems: state.items };
+      return { ...state, savedValues: state.values, savedItems: state.items, savedDrafts: state.drafts };
   }
 }
+
+function definedOnly<T extends object>(o: T): Partial<T> {
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
+}
+
+export const canUndo = (s: EditorState) => s.past.length > 0;
+export const canRedo = (s: EditorState) => s.future.length > 0;
 
 // Fields whose value differs from what the file had when opened.
 export function changedValues(state: EditorState): Map<string, FieldValue> {
@@ -127,6 +331,7 @@ export function changedValues(state: EditorState): Map<string, FieldValue> {
 }
 
 export function hasUnsavedChanges(state: EditorState): boolean {
+  if (state.drafts !== state.savedDrafts) return true;
   if (state.items !== state.savedItems) {
     if (state.items.length !== state.savedItems.length) return true;
     if (state.items.some((item, i) => item !== state.savedItems[i])) return true;

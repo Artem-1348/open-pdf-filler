@@ -7,6 +7,7 @@ import {
   PDFDropdown,
   PDFName,
   PDFOptionList,
+  PDFSignature,
   PDFTextField,
   StandardFonts,
   degrees,
@@ -27,6 +28,7 @@ import {
 } from './geometry';
 import { BASELINE_RATIO, TEXT_LINE_HEIGHT, TEXT_PADDING, autoFieldFontSize } from './layout';
 import { textsIn, type FieldValue, type FormFieldInfo, type PlacedItem } from './model';
+import { DATE_FORMAT_KEY, KIND_KEY, applyStructure, widgetPageIndex, type StructureInput } from './structure';
 
 export type FontFile = 'regular' | 'italic';
 
@@ -39,6 +41,8 @@ export interface SaveRequest {
   // Only fields whose value the user changed.
   values: ReadonlyMap<string, FieldValue>;
   items: ReadonlyArray<PlacedItem>;
+  // Form builder changes (Phase 3). `fields` must then describe the result.
+  structure?: StructureInput;
   flatten: boolean;
   loadFont(file: FontFile): Promise<Uint8Array>;
 }
@@ -85,7 +89,8 @@ export async function savePdf(req: SaveRequest): Promise<Uint8Array> {
   const pages = doc.getPages();
   const frames = pages.map(frameOf);
 
-  await fillFields(doc, req, frames, fonts);
+  if (req.structure) applyStructure(doc, req.structure, frames);
+  await fillFields(doc, req, frames, fonts, !!req.structure);
   for (const item of req.items) {
     const page = pages[item.page];
     if (page) await drawItem(page, frames[item.page], item, fonts);
@@ -93,6 +98,10 @@ export async function savePdf(req: SaveRequest): Promise<Uint8Array> {
 
   const form = doc.getForm();
   if (req.flatten) {
+    // Unsigned signature fields have nothing to draw; drop them first.
+    for (const field of form.getFields()) {
+      if (field instanceof PDFSignature) form.removeField(field);
+    }
     form.flatten({ updateFieldAppearances: false });
   }
 
@@ -112,8 +121,8 @@ export async function savePdf(req: SaveRequest): Promise<Uint8Array> {
 
 // ---------------------------------------------------------------- fields
 
-async function fillFields(doc: PDFDocument, req: SaveRequest, frames: PageFrame[], fonts: FontSet) {
-  if (req.values.size === 0) return;
+async function fillFields(doc: PDFDocument, req: SaveRequest, frames: PageFrame[], fonts: FontSet, structureChanged: boolean) {
+  if (req.values.size === 0 && !structureChanged) return;
   const form = doc.getForm();
   const widgetPages = widgetPageIndex(doc);
   let textChanged = false;
@@ -159,7 +168,7 @@ async function fillFields(doc: PDFDocument, req: SaveRequest, frames: PageFrame[
     }
   }
 
-  if (textChanged) {
+  if (textChanged || structureChanged) {
     // Appearance streams make values visible in viewers that don't draw
     // fields themselves, like Preview and iOS (design D1).
     form.updateFieldAppearances(await fonts.forFields());
@@ -222,18 +231,6 @@ function setToggle(
   field.acroField.dict.set(PDFName.of('V'), onValue ?? PDFName.of('Off'));
 }
 
-function widgetPageIndex(doc: PDFDocument): Map<PDFDict, number> {
-  const map = new Map<PDFDict, number>();
-  doc.getPages().forEach((page, index) => {
-    const annots = page.node.Annots();
-    if (!annots) return;
-    for (let i = 0; i < annots.size(); i++) {
-      const dict = annots.lookupMaybe(i, PDFDict);
-      if (dict) map.set(dict, index);
-    }
-  });
-  return map;
-}
 
 // ---------------------------------------------------------------- placed items
 
@@ -397,6 +394,9 @@ function permissionsFromBits(bits: number | undefined) {
 // Field details PDFium doesn't report (currently the maximum text length).
 export interface FieldExtras {
   maxLen?: number;
+  // A text field the form builder marked as a date.
+  isDate?: boolean;
+  dateFormat?: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD';
   // From the default appearance; 0 = auto. PDFium reports a computed size.
   fontSize?: number;
 }
@@ -410,11 +410,20 @@ export async function readFieldExtras(original: Uint8Array, password?: string): 
       const maxLen = field.getMaxLength();
       if (maxLen !== undefined) extras.maxLen = maxLen;
     }
+    if (field instanceof PDFTextField) {
+      const kind = field.acroField.dict.get(PDFName.of(KIND_KEY));
+      if (kind instanceof PDFName && kind.decodeText() === 'Date') {
+        extras.isDate = true;
+        const format = field.acroField.dict.lookup(PDFName.of(DATE_FORMAT_KEY));
+        const text = format && 'decodeText' in format ? (format as { decodeText(): string }).decodeText() : '';
+        if (text === 'MM/DD/YYYY' || text === 'DD/MM/YYYY' || text === 'YYYY-MM-DD') extras.dateFormat = text;
+      }
+    }
     if (field instanceof PDFTextField || field instanceof PDFDropdown || field instanceof PDFOptionList) {
       const size = daFontSize(field);
       if (size !== undefined) extras.fontSize = size;
     }
-    if (extras.maxLen !== undefined || extras.fontSize !== undefined) out.set(field.getName(), extras);
+    if (Object.keys(extras).length) out.set(field.getName(), extras);
   }
   return out;
 }

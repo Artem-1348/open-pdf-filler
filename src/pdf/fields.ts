@@ -47,6 +47,7 @@ export function buildFields(widgetsByPage: ReadonlyArray<ReadonlyArray<PdfWidget
         info = {
           name,
           label: labelFor(w.field.alternateName, name),
+          tooltip: w.field.alternateName ?? '',
           kind,
           widgets: [],
           options: options.map((o) => o.label),
