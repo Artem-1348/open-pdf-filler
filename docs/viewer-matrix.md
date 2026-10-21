@@ -19,8 +19,8 @@ password-protected copy; password `open-sesame`).
 | Open PDF Filler (PDFium) | All 5 browser profiles | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Automated e2e: save, reopen, compare, 2026-10-20 | |
 | Firefox built-in viewer (PDF.js) | Desktop | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Automated, PDF.js 6.4.299, 2026-10-20 | |
 | Preview (PDFKit) | macOS 15.6.1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Automated, PDFKit via `scripts/check-pdfkit.swift`, 2026-10-20 | Fillable list boxes: Preview draws its own appearance without the selection highlight; value is correct |
-| Files / Markup (PDFKit) | iOS 27.0.1 | — | — | — | — | — | — | Same engine as Preview; manual check pending | |
-| Adobe Acrobat Reader | macOS | — | — | — | — | — | — | Manual, pending (not installed on the test Mac) | |
+| Open PDF Filler on iPhone (Safari) | iOS 27.0.1, iPhone 17 Pro Max | ✅ | ✅ | — | — | — | ✅ | Manual by Artem-1348 on the live site with the IRS W-9, 2026-10-21: "perfect" | Files/Markup uses PDFKit, checked automatically above |
+| Adobe Acrobat Reader | macOS | — | — | — | — | — | — | Not tested: not installed on the test Mac; deferred to the Phase 6 matrix sign-off | |
 | Adobe Acrobat Reader | Windows | — | — | — | — | — | — | Not tested (no device) | |
 | Google Drive viewer | Android | — | — | — | — | — | — | Not tested (no device) | |
 | Adobe Acrobat Reader | Android | — | — | — | — | — | — | Not tested (no device) | |

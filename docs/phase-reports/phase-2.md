@@ -1,17 +1,17 @@
 # Phase 2 — Fill & save (FR-3, FR-4, FR-9): test report
 
-**Date:** 2026-10-20 · **Gate:** filled files reopen with every value intact in Acrobat, Preview,
+**Date:** 2026-10-21 · **Gate:** filled files reopen with every value intact in Acrobat, Preview,
 Chrome, iOS and Android.
 
-## Result: automated part passed; manual viewer checks pending
+## Result: gate passed, except Acrobat (deferred) and Android (no device)
 
 | Gate viewer | Engine | Result |
 | --- | --- | --- |
 | Chrome | PDFium | ✅ automated |
 | Preview | PDFKit | ✅ automated |
-| iOS | PDFKit (same engine as Preview) | ✅ automated via the shared engine; manual check on iPhone pending |
-| Acrobat | Adobe | ⏳ manual check pending (Acrobat Reader isn't installed on the test Mac) |
-| Android | PDFium (Chrome, Drive viewer) | ✅ engine automated; ⏳ no Android device available |
+| iOS | PDFKit (same engine as Preview) | ✅ automated via the shared engine; ✅ manual: W-9 filled, signed and saved on an iPhone 17 Pro Max (iOS 27.0.1) |
+| Acrobat | Adobe | ⏸ deferred to the Phase 6 viewer-matrix sign-off (Acrobat Reader isn't installed on the test Mac) |
+| Android | PDFium (Chrome, Drive viewer) | ✅ engine automated; no Android device available |
 
 Details per field type: [viewer-matrix.md](../viewer-matrix.md).
 
@@ -31,7 +31,7 @@ moved from Phase 6 into Phase 2 (decision D1).
 | Suite | Result |
 | --- | --- |
 | Typecheck and lint | ✅ |
-| Unit + writer + cross-viewer (Vitest) | 74 passed |
+| Unit + writer + cross-viewer (Vitest) | 76 passed |
 | End-to-end (Playwright 1.64: Chromium, Firefox, WebKit, Pixel 7, iPhone 14) | 375 passed, 25 skipped by design |
 
 ## Bugs found and fixed in this phase
@@ -54,7 +54,8 @@ No open P1 or P2 bugs.
 - **Fillable list boxes in Preview** show the right value but without a selection highlight
   (Preview draws its own appearance). Flattened copies show the highlight.
 - **No undo/redo** (Phase 3). **No autosaved drafts** (backlog).
-- **Touch dragging on iPhone** can't be automated; checked by hand on a real iPhone (pending).
+- **Touch dragging on iPhone** can't be automated; covered by the manual iPhone check.
+- **Flat PDFs that used to be forms** (fields stripped by "Print → Save as PDF") show no fields; rebuilding them is now Phase 4's first detector ([roadmap-changes.md](../roadmap-changes.md)).
 - **Bundle:** first load unchanged at 213 KB compressed JS; the writer (405 KB compressed) and the
   Noto Sans fonts (0.6 MB each) load only when needed.
 
@@ -62,9 +63,9 @@ No open P1 or P2 bugs.
 
 | Item | Status |
 | --- | --- |
-| Acceptance criteria pass | ⏳ automated part ✅; manual Acrobat and iPhone checks pending |
-| Automated tests green in CI | ⏳ PR #1 |
+| Acceptance criteria pass | ✅ (Acrobat deferred to Phase 6, Android: no device) |
+| Automated tests green in CI | ✅ PR #1 and `main` |
 | No open P1/P2 bugs | ✅ |
 | One-page test report | ✅ this file |
-| Demo on a laptop and a phone | ⏳ |
-| Tagged release v0.2 | ⏳ |
+| Demo on a laptop and a phone | ✅ |
+| Tagged release v0.2 | ✅ v0.2.0 |
