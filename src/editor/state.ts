@@ -54,9 +54,19 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       const values = new Map(action.fields.map((f) => [f.name, f.initial]));
       return { ...emptyEditor, fields: action.fields, canEdit: action.canEdit, values, savedValues: values };
     }
-    case 'enrich-fields':
+    case 'enrich-fields': {
+      // A length limit can arrive after the user started typing; trim to it
+      // so the screen matches what will be saved.
+      const values = new Map(state.values);
+      for (const [name, extra] of action.extras) {
+        const v = values.get(name);
+        if (extra.maxLen !== undefined && v?.kind === 'text' && v.text.length > extra.maxLen) {
+          values.set(name, { kind: 'text', text: v.text.slice(0, extra.maxLen) });
+        }
+      }
       return {
         ...state,
+        values,
         fields: state.fields.map((f) => {
           const extra = action.extras.get(f.name);
           if (!extra) return f;
@@ -67,6 +77,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
           };
         }),
       };
+    }
     case 'set-value': {
       const values = new Map(state.values);
       values.set(action.name, action.value);

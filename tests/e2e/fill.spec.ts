@@ -21,10 +21,12 @@ async function saveCopy(page: Page, testInfo: TestInfo, { flatten = false } = {}
   const download = page.waitForEvent('download');
   await page.getByTestId('save-confirm').click();
   const d = await download;
+  // WebKit on Linux replaces spaces in download names with underscores.
+  const name = d.suggestedFilename().replace(/_/g, ' ');
   const path = testInfo.outputPath(d.suggestedFilename());
   await d.saveAs(path);
   await expect(page.getByTestId('save-dialog')).toHaveCount(0);
-  return { path, name: d.suggestedFilename() };
+  return { path, name };
 }
 
 // A press-move-release, as a mouse or (Android Chrome) a real touch.
@@ -77,6 +79,8 @@ test.describe('existing form fields (FR-3)', () => {
     await field(page, 'size', 1).click();
     await field(page, 'colour').selectOption('Green');
     await field(page, 'toppings').selectOption(['Olives', 'Onions']);
+    // The length limit is read just after opening.
+    await expect(field(page, 'pin')).toHaveAttribute('maxlength', '4');
     await field(page, 'pin').fill('123456'); // max length 4
     await expect(field(page, 'pin')).toHaveValue('1234');
     // Fields on a page rotated 90°.
