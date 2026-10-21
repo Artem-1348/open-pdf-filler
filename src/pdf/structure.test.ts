@@ -5,7 +5,8 @@ import { PDFDict, PDFDocument, PDFName } from '@cantoo/pdf-lib';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it } from 'vitest';
 import { findText, openWithPdfium, readFieldsWithPdfium } from '../../tests/support/pdfium-node';
-import { draftsFromFields, fieldsFromDrafts, newDraft, sortByPageOrder, type CreatableKind, type FieldDraft } from '../builder/model';
+import { draftsFromFields, fieldsFromDrafts, newDraft, sortByPageOrder, type FieldDraft } from '../builder/model';
+import { GATE_VALUES, gateForm } from '../../tests/support/gate-form';
 import type { FieldValue, FormFieldInfo } from './model';
 import { readFieldExtras, savePdf, type FontFile } from './writer';
 
@@ -36,47 +37,6 @@ async function build(
   });
   return { bytes, drafts };
 }
-
-// The Phase 3 gate form: 20 fields of every kind, laid out in rows.
-function gateForm(): FieldDraft[] {
-  const drafts: FieldDraft[] = [];
-  const add = (kind: CreatableKind, x: number, y: number, patch: Partial<FieldDraft> = {}) => {
-    const d = { ...newDraft(kind, 0, { x, y }, drafts, LETTER), ...patch };
-    drafts.push(d);
-    return d;
-  };
-  // 10 text fields: two columns of five rows.
-  for (let row = 0; row < 5; row++) {
-    add('text', 160, 140 + row * 40, { name: `First ${row + 1}` });
-    add('text', 420, 140 + row * 40, { name: `Second ${row + 1}`, ...(row === 0 ? { required: true } : {}) });
-  }
-  drafts.find((d) => d.name === 'Second 2')!.maxLen = 5;
-  Object.assign(drafts.find((d) => d.name === 'Second 3')!, { multiline: true, box: { x: 340, y: 210, width: 160, height: 40 } });
-  add('date', 160, 360, { name: 'Start date' });
-  add('date', 420, 360, { name: 'End date', dateFormat: 'DD/MM/YYYY', tooltip: 'Date (DD/MM/YYYY)' });
-  add('checkbox', 100, 400, { name: 'Agree terms', exportValue: 'Agree' });
-  add('checkbox', 200, 400, { name: 'Newsletter' });
-  add('checkbox', 300, 400, { name: 'Member' });
-  // Radio group "Plan" with 3 options, "Contact" with 2.
-  for (const [i, v] of ['Basic', 'Plus', 'Pro'].entries()) add('radio', 100 + i * 80, 440, { name: 'Plan', exportValue: v });
-  for (const [i, v] of ['Email', 'Phone'].entries()) add('radio', 100 + i * 80, 480, { name: 'Contact', exportValue: v });
-  add('dropdown', 160, 520, { name: 'Country', options: ['Canada', 'Germany', 'Japan'] });
-  add('dropdown', 420, 520, { name: 'Size', options: ['S', 'M', 'L'], editable: true });
-  add('signature', 200, 600, { name: 'Signature', tooltip: 'Sign here' });
-  return drafts;
-}
-
-const GATE_VALUES: Record<string, FieldValue> = {
-  'First 1': { kind: 'text', text: 'Ada' },
-  'Second 2': { kind: 'text', text: '12345' },
-  'Second 3': { kind: 'text', text: 'Line one\nLine two' },
-  'Start date': { kind: 'text', text: '10/21/2026' },
-  'Agree terms': { kind: 'toggle', on: 0 },
-  Plan: { kind: 'toggle', on: 1 },
-  Contact: { kind: 'toggle', on: 0 },
-  Country: { kind: 'choice', selected: ['Japan'] },
-  Size: { kind: 'choice', selected: ['XL'] },
-};
 
 const byName = (fields: FormFieldInfo[], name: string) => {
   const f = fields.find((x) => x.name === name);

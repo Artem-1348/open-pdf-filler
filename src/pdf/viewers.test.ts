@@ -14,6 +14,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { readFieldsWithPdfium } from '../../tests/support/pdfium-node';
 import type { FieldValue, PlacedItem } from './model';
 import { savePdf, type FontFile } from './writer';
+import { GATE_VALUES, gateForm } from '../../tests/support/gate-form';
+import { fieldsFromDrafts, sortByPageOrder } from '../builder/model';
 
 const OUT = 'test-results/gate-samples';
 const corpus = (name: string) => new Uint8Array(readFileSync(`tests/corpus/${name}`));
@@ -85,6 +87,9 @@ const SAMPLES: Sample[] = [
 ];
 
 const saved = new Map<string, Uint8Array>();
+// The Phase 3 gate form, built on simple.pdf and filled.
+const GATE_DRAFTS = sortByPageOrder(gateForm());
+const GATE_ORDER = GATE_DRAFTS.map((d) => d.name);
 
 beforeAll(async () => {
   mkdirSync(OUT, { recursive: true });
@@ -103,6 +108,17 @@ beforeAll(async () => {
     saved.set(s.file, bytes);
     writeFileSync(join(OUT, s.file), bytes);
   }
+  const built = await savePdf({
+    original: corpus('simple.pdf'),
+    fields: fieldsFromDrafts(GATE_DRAFTS, []),
+    values: new Map(Object.entries(GATE_VALUES)),
+    items: [],
+    flatten: false,
+    loadFont,
+    structure: { drafts: GATE_DRAFTS, originalFields: [] },
+  });
+  saved.set('built-form.pdf', built);
+  writeFileSync(join(OUT, 'built-form.pdf'), built);
 }, 60_000);
 
 // ------------------------------------------------------------------ PDF.js
@@ -191,6 +207,21 @@ describe('PDF.js (Firefox)', () => {
   });
 });
 
+describe('PDF.js (Firefox): the Phase 3 built form', () => {
+  it('has all 20 fields with their values, in tab order', async () => {
+    const f = await pdfjsFields('built-form.pdf');
+    expect(Object.keys(f)).toHaveLength(20);
+    expect(f['First 1'][0].fieldValue).toBe('Ada');
+    expect(f['Second 3'][0].fieldValue).toBe('Line one\nLine two');
+    expect(isOn(f['Agree terms'][0])).toBe(true);
+    expect(f.Plan.map(isOn)).toEqual([false, true, false]);
+    expect([f.Country[0].fieldValue].flat()).toEqual(['Japan']);
+    const doc = await pdfjsOpen('built-form.pdf');
+    const ann = (await (await doc.getPage(1)).getAnnotations()) as Array<{ fieldName: string; subtype: string }>;
+    expect(ann.filter((a) => a.subtype === 'Widget').map((a) => a.fieldName)).toEqual(GATE_ORDER);
+  });
+});
+
 // ------------------------------------------------------------------ PDFKit
 
 interface PdfKitReport {
@@ -216,7 +247,7 @@ describe.skipIf(!canRunPdfKit)('PDFKit (macOS Preview, iPhone Files)', () => {
   let reports: Map<string, PdfKitReport>;
 
   beforeAll(() => {
-    const args = SAMPLES.map((s) => join(OUT, s.file) + (s.password ? `::${s.password}` : ''));
+    const args = [...SAMPLES.map((s) => join(OUT, s.file) + (s.password ? `::${s.password}` : '')), join(OUT, 'built-form.pdf')];
     const json = execFileSync('swift', ['scripts/check-pdfkit.swift', OUT, ...args], { encoding: 'utf8', timeout: 180_000 });
     reports = new Map((JSON.parse(json) as PdfKitReport[]).map((r) => [r.file, r]));
   }, 200_000);
@@ -239,6 +270,18 @@ describe.skipIf(!canRunPdfKit)('PDFKit (macOS Preview, iPhone Files)', () => {
     expect(flat.text[0]).toContain('Ada Lovelace');
     const rotated = reports.get('placed-rotated.pdf')!;
     rotated.text.forEach((t, i) => expect(t).toContain(`Placed on page ${i + 1}`));
+  });
+
+  it('shows the Phase 3 built form: 20 fields, values, tab order', () => {
+    const built = reports.get('built-form.pdf')!;
+    expect(new Set(built.fields.map((f) => f.name)).size).toBe(20);
+    expect(field('built-form.pdf', 'First 1')[0].value).toBe('Ada');
+    expect(field('built-form.pdf', 'Second 3')[0].value).toBe('Line one\nLine two');
+    expect(field('built-form.pdf', 'Agree terms')[0].value).not.toBe('off');
+    expect(field('built-form.pdf', 'Plan').map((w) => w.value !== 'off')).toEqual([false, true, false]);
+    expect(field('built-form.pdf', 'Country')[0].value).toBe('Japan');
+    // Preview and iOS list widgets in the page's annotation order.
+    expect(built.fields.map((f) => f.name)).toEqual(GATE_ORDER);
   });
 
   it('shows the W-9, Cyrillic and the protected copy', () => {

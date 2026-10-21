@@ -4,6 +4,7 @@ import regularFontUrl from '../assets/fonts/NotoSans-Regular.ttf?url';
 import italicFontUrl from '../assets/fonts/NotoSans-Italic.ttf?url';
 import type { FontFile } from '../pdf/writer';
 import type { FieldValue, FormFieldInfo, PlacedItem } from '../pdf/model';
+import type { StructureInput } from '../pdf/structure';
 
 export interface SaveInput {
   file: Blob;
@@ -13,6 +14,7 @@ export interface SaveInput {
   values: Map<string, FieldValue>;
   items: PlacedItem[];
   flatten: boolean;
+  structure?: StructureInput;
 }
 
 export async function saveCopy(input: SaveInput): Promise<Uint8Array> {
@@ -25,6 +27,7 @@ export async function saveCopy(input: SaveInput): Promise<Uint8Array> {
     values: input.values,
     items: input.items,
     flatten: input.flatten,
+    structure: input.structure,
     loadFont,
   });
 }

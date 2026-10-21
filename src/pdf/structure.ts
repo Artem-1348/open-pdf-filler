@@ -69,7 +69,7 @@ export function applyStructure(doc: PDFDocument, input: StructureInput, frames: 
     const needsRecreate = drafts.some(
       (d) =>
         d.name !== original.name ||
-        d.kind === 'date' !== !!original.isDate ||
+        (d.kind === 'date') !== !!original.isDate ||
         ((d.kind === 'checkbox' || d.kind === 'radio') && d.exportValue !== original.widgets[d.source!.widget]?.exportValue),
     );
     if (needsRecreate) {

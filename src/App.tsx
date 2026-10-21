@@ -26,7 +26,9 @@ import { SaveDialog, type SaveChoice } from './editor/SaveDialog';
 import { SignatureDialog } from './editor/SignatureDialog';
 import { savedFileName } from './editor/fileName';
 import { downloadBytes, isSaveError, loadFieldExtras, saveCopy } from './editor/saving';
-import { changedValues, editorReducer, emptyEditor, hasUnsavedChanges, meaningfulItems } from './editor/state';
+import { changedValues, editorReducer, emptyEditor, hasUnsavedChanges, meaningfulItems, structureChanges } from './editor/state';
+import { PropertiesPanel } from './builder/PropertiesPanel';
+import { clampToPage, duplicateDraft, type FieldDraft } from './builder/model';
 import type { SignatureContent } from './pdf/model';
 
 interface OpenDoc {
@@ -142,6 +144,9 @@ export default function App() {
     const previous = currentRef.current;
     if (previous) void closePdf(previous.doc);
     const { doc: nextDoc, fileName, form } = next;
+    // Set right away (not in an effect): field extras can arrive before the
+    // next render, and must recognise this document as the open one.
+    currentRef.current = next;
     setCurrent(next);
     dispatch({ type: 'reset', fields: form.fields, canEdit: form.canEdit });
     if (form.fields.some((f) => f.kind === 'text' || f.kind === 'combo' || f.kind === 'list')) {
@@ -167,6 +172,7 @@ export default function App() {
     openSeq.current++;
     setLoadingName(null);
     void closePdf(previous.doc);
+    currentRef.current = null;
     setCurrent(null);
     dispatch({ type: 'reset', fields: [], canEdit: true });
     setCurrentPage(0);
@@ -344,7 +350,7 @@ export default function App() {
     [],
   );
 
-  const fieldsByPage = useMemo(() => groupFieldsByPage(editor.fields), [editor.fields]);
+  const fieldsByPage = useMemo(() => groupFieldsByPage(editor.fields, editor.drafts), [editor.fields, editor.drafts]);
   const editorApi = useMemo<EditorApi>(
     () => ({ state: editor, dispatch, fieldsByPage, requestSignature }),
     [editor, fieldsByPage, requestSignature],
@@ -366,6 +372,7 @@ export default function App() {
         permissions: current.form.permissions,
         fields: editor.fields,
         values: changedValues(editor),
+        structure: structureChanges(editor),
         items: meaningfulItems(editor.items),
         flatten,
       });
@@ -386,22 +393,65 @@ export default function App() {
     }
   };
 
-  // Delete removes the selected item; Escape drops the tool or selection.
+  // Keyboard: undo/redo everywhere; Delete, Escape, arrows and duplicate act
+  // on the selection. Keys typed into a field are left alone.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const typing = !!target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
-      if (e.key === 'Escape' && !typing) {
+      if (typing) return;
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+      if (mod && key === 'z') {
+        e.preventDefault();
+        dispatch({ type: e.shiftKey ? 'redo' : 'undo' });
+        return;
+      }
+      if (mod && key === 'y') {
+        e.preventDefault();
+        dispatch({ type: 'redo' });
+        return;
+      }
+      if (editor.mode === 'edit') {
+        const selected = (editor.drafts ?? []).filter((d) => editor.selection.includes(d.id));
+        if (e.key === 'Escape') {
+          if (editor.buildTool) dispatch({ type: 'set-build-tool', tool: null });
+          else dispatch({ type: 'select-drafts', ids: [] });
+        } else if ((e.key === 'Delete' || e.key === 'Backspace') && selected.length) {
+          e.preventDefault();
+          dispatch({ type: 'remove-drafts', ids: selected.map((d) => d.id) });
+        } else if (mod && key === 'd' && selected.length) {
+          e.preventDefault();
+          const copies: FieldDraft[] = [];
+          for (const d of selected) copies.push(duplicateDraft(d, [...(editor.drafts ?? []), ...copies], doc!.pages[d.page].size));
+          dispatch({ type: 'add-drafts', drafts: copies });
+        } else if (e.key.startsWith('Arrow') && selected.length) {
+          e.preventDefault();
+          const step = e.shiftKey ? 10 : 1;
+          const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+          const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+          dispatch({
+            type: 'update-drafts',
+            key: `nudge:${selected.map((d) => d.id).join(',')}`,
+            patches: selected.map((d) => ({
+              id: d.id,
+              patch: { box: clampToPage({ ...d.box, x: d.box.x + dx, y: d.box.y + dy }, doc!.pages[d.page].size) },
+            })),
+          });
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
         if (editor.tool) dispatch({ type: 'set-tool', tool: null });
         else if (editor.selectedId) dispatch({ type: 'select', id: null });
-      } else if ((e.key === 'Delete' || e.key === 'Backspace') && !typing && editor.selectedId) {
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && editor.selectedId) {
         e.preventDefault();
         dispatch({ type: 'remove-item', id: editor.selectedId });
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [editor.tool, editor.selectedId]);
+  }, [editor.tool, editor.selectedId, editor.mode, editor.drafts, editor.selection, editor.buildTool, doc]);
 
   const onBackgroundPointerDown = useCallback(() => {
     if (editor.selectedId && !editor.editingId) dispatch({ type: 'select', id: null });
@@ -473,7 +523,7 @@ export default function App() {
         </div>
       )}
 
-      <main className={editor.tool ? 'workspace placing' : 'workspace'}>
+      <main className={['workspace', editor.tool ? 'placing' : '', editor.mode === 'edit' ? 'editing-form' : ''].join(' ').trim()}>
         {doc ? (
           <EditorContext.Provider value={editorApi}>
             {thumbnailsOpen && (
@@ -490,6 +540,9 @@ export default function App() {
               pagesWithFields={current?.form.pagesWithFields ?? NO_PAGES}
               onBackgroundPointerDown={onBackgroundPointerDown}
             />
+            {editor.mode === 'edit' && (
+              <PropertiesPanel pageSizes={doc.pages.map((p) => p.size)} onGoToPage={goToPage} />
+            )}
           </EditorContext.Provider>
         ) : (
           <EmptyState onOpen={() => fileInputRef.current?.click()} />

@@ -3,9 +3,7 @@ import type { PdfDocumentObject, PdfPageObject, SearchResult } from '../engine/e
 import { useRenderedImage } from '../engine/useRenderedImage';
 import type { PageBox } from '../lib/layout';
 import { bitmapDpr } from '../lib/zoom';
-import { FieldLayer } from '../editor/FieldLayer';
-import { ItemLayer } from '../editor/ItemLayer';
-import { PlacementSurface } from '../editor/PlacementSurface';
+import { PageLayers } from '../editor/PageLayers';
 
 interface Props {
   doc: PdfDocumentObject;
@@ -75,13 +73,7 @@ export const PageView = memo(function PageView({
           )}
         </div>
       )}
-      {near && (
-        <>
-          {hasFields && <FieldLayer page={page.index} scale={scale} />}
-          <ItemLayer page={page.index} scale={scale} pageWidth={page.size.width} pageHeight={page.size.height} />
-          <PlacementSurface page={page.index} scale={scale} />
-        </>
-      )}
+      {near && <PageLayers page={page.index} scale={scale} pageWidth={page.size.width} pageHeight={page.size.height} />}
     </div>
   );
 });

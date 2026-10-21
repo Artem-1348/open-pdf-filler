@@ -34,6 +34,9 @@ export interface EditorState {
   originalFields: FormFieldInfo[];
   // The form's structure once the user edits it; null while untouched.
   drafts: FieldDraft[] | null;
+  // Drafts as first made from the PDF; unchanged drafts mean no structure
+  // changes to write.
+  baseDrafts: FieldDraft[] | null;
   // The user reordered tabs by hand; otherwise drafts stay in page order.
   customOrder: boolean;
   // The fields Fill mode and the writer use: from drafts, or the originals.
@@ -97,6 +100,7 @@ export type EditorAction =
 export const emptyEditor: EditorState = {
   originalFields: [],
   drafts: null,
+  baseDrafts: null,
   customOrder: false,
   fields: [],
   canEdit: true,
@@ -209,7 +213,11 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       }) ?? null;
       const next = withDrafts({ ...state, originalFields, values }, drafts);
       // Extras describe the file as opened; they aren't an unsaved change.
-      return { ...next, savedDrafts: state.drafts === state.savedDrafts ? next.drafts : state.savedDrafts };
+      return {
+        ...next,
+        savedDrafts: state.drafts === state.savedDrafts ? next.drafts : state.savedDrafts,
+        baseDrafts: state.drafts === state.baseDrafts ? next.drafts : state.baseDrafts,
+      };
     }
     case 'set-value': {
       const values = new Map(state.values);
@@ -258,7 +266,11 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         // Entering Edit form turns the PDF's fields into drafts; this alone
         // is not a change to the document.
         const next = withDrafts(base, draftsFromFields(state.originalFields), false);
-        return { ...next, savedDrafts: state.savedDrafts === null ? next.drafts : state.savedDrafts };
+        return {
+          ...next,
+          baseDrafts: next.drafts,
+          savedDrafts: state.savedDrafts === null ? next.drafts : state.savedDrafts,
+        };
       }
       return base;
     }
@@ -387,4 +399,10 @@ export function initialBox(kind: PlacedKind, point: { x: number; y: number }, si
 // Today's date in the user's own short format, e.g. 10/20/2026 or 20.10.2026.
 export function todayText(date = new Date(), locale?: string): string {
   return new Intl.DateTimeFormat(locale, { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+}
+
+// Structure changes to write when saving, relative to the original file.
+export function structureChanges(state: EditorState) {
+  if (!state.drafts || state.drafts === state.baseDrafts) return undefined;
+  return { drafts: state.drafts, originalFields: state.originalFields };
 }
