@@ -3,6 +3,9 @@ import type { PdfDocumentObject, PdfPageObject, SearchResult } from '../engine/e
 import { useRenderedImage } from '../engine/useRenderedImage';
 import type { PageBox } from '../lib/layout';
 import { bitmapDpr } from '../lib/zoom';
+import { FieldLayer } from '../editor/FieldLayer';
+import { ItemLayer } from '../editor/ItemLayer';
+import { PlacementSurface } from '../editor/PlacementSurface';
 
 interface Props {
   doc: PdfDocumentObject;
@@ -13,6 +16,9 @@ interface Props {
   near: boolean;
   matches: ReadonlyArray<SearchResult>;
   activeMatch: SearchResult | null;
+  // The page has fillable fields: render it without them and show editable
+  // controls instead.
+  hasFields: boolean;
 }
 
 export const PageView = memo(function PageView({
@@ -24,6 +30,7 @@ export const PageView = memo(function PageView({
   near,
   matches,
   activeMatch,
+  hasFields,
 }: Props) {
   const url = useRenderedImage({
     doc,
@@ -31,6 +38,7 @@ export const PageView = memo(function PageView({
     scaleFactor: scale,
     dpr: bitmapDpr(box.width, box.height, dpr),
     active: near,
+    withForms: !hasFields,
   });
   const label = `Page ${page.index + 1} of ${doc.pageCount}`;
 
@@ -40,8 +48,8 @@ export const PageView = memo(function PageView({
       data-testid="page"
       data-page-index={page.index}
       style={{ width: box.width, height: box.height }}
-      role="img"
       aria-label={label}
+      role="group"
     >
       {url ? (
         <img className="page-image" src={url} alt="" draggable={false} data-testid="page-image" />
@@ -66,6 +74,13 @@ export const PageView = memo(function PageView({
             )),
           )}
         </div>
+      )}
+      {near && (
+        <>
+          {hasFields && <FieldLayer page={page.index} scale={scale} />}
+          <ItemLayer page={page.index} scale={scale} pageWidth={page.size.width} pageHeight={page.size.height} />
+          <PlacementSurface page={page.index} scale={scale} />
+        </>
       )}
     </div>
   );

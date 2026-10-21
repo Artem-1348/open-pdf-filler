@@ -158,6 +158,60 @@ await (async () => {
   write('fillable-form.pdf', await doc.save(), { expect: 'open', pages: 1, note: 'text, checkbox, radio, dropdown fields' });
 })();
 
+// 6b. Every field type, blank, on upright and rotated pages (Phase 2 filling).
+await (async () => {
+  const { doc, font, bold } = await newDoc('All field types');
+  const form = doc.getForm();
+  for (const angle of [0, 90, 270]) {
+    const page = doc.addPage(SIZES.letter);
+    page.setRotation(degrees(angle));
+    const s = `_p${angle}`;
+    heading(page, bold, `Fields on a page rotated ${angle}`);
+    page.drawText('Name', { x: 72, y: 660, size: 12, font });
+    const name = form.createTextField(`name${s}`);
+    name.addToPage(page, { x: 180, y: 652, width: 300, height: 24 });
+    name.setFontSize(12);
+    page.drawText('Agree', { x: 72, y: 610, size: 12, font });
+    form.createCheckBox(`agree${s}`).addToPage(page, { x: 180, y: 604, width: 18, height: 18 });
+    if (angle !== 0) continue;
+    page.drawText('Notes', { x: 72, y: 560, size: 12, font });
+    const notes = form.createTextField('notes');
+    notes.enableMultiline();
+    notes.addToPage(page, { x: 180, y: 500, width: 300, height: 72 });
+    // "Auto" font size (0), as many real forms use. pdf-lib's setFontSize(0)
+    // is ignored, so write the default appearance directly.
+    notes.acroField.setDefaultAppearance('0 0 0 rg\n/Helvetica 0 Tf');
+    page.drawText('Size', { x: 72, y: 460, size: 12, font });
+    const size = form.createRadioGroup('size');
+    for (const [i, v] of ['small', 'medium', 'large'].entries()) {
+      size.addOptionToPage(v, page, { x: 180 + i * 80, y: 454, width: 18, height: 18 });
+    }
+    page.drawText('Colour', { x: 72, y: 410, size: 12, font });
+    const colour = form.createDropdown('colour');
+    colour.addOptions(['Red', 'Green', 'Blue']);
+    colour.addToPage(page, { x: 180, y: 402, width: 160, height: 24 });
+    colour.setFontSize(12);
+    page.drawText('Toppings', { x: 72, y: 360, size: 12, font });
+    const toppings = form.createOptionList('toppings');
+    toppings.addOptions(['Cheese', 'Olives', 'Peppers', 'Onions']);
+    toppings.enableMultiselect();
+    toppings.addToPage(page, { x: 180, y: 290, width: 160, height: 80 });
+    toppings.setFontSize(11);
+    page.drawText('PIN (4)', { x: 72, y: 250, size: 12, font });
+    const pin = form.createTextField('pin');
+    pin.setMaxLength(4);
+    pin.addToPage(page, { x: 180, y: 242, width: 80, height: 24 });
+    pin.acroField.setDefaultAppearance('0 0 0 rg\n/Helvetica 0 Tf');
+  }
+  // updateFieldAppearances: false keeps the "auto" sizes; pdf-lib would
+  // otherwise bake its own computed size into them.
+  write('all-field-types.pdf', await doc.save({ updateFieldAppearances: false }), {
+    expect: 'open',
+    pages: 3,
+    note: 'blank text, multiline, max-length, checkbox, radio, dropdown, multi-select list; rotated pages',
+  });
+})();
+
 // 7. Non-English Latin text.
 await (async () => {
   const { doc, font, bold } = await newDoc('Accented text');
@@ -179,7 +233,12 @@ await (async () => {
   const page = doc.addPage(SIZES.letter);
   heading(page, bold, 'Secret document');
   body(page, font, ['You opened the password-protected file.']);
-  doc.encrypt({ userPassword: 'open-sesame', ownerPassword: 'owner-secret' });
+  // Everything allowed once opened, so the app can fill it (Phase 2).
+  doc.encrypt({
+    userPassword: 'open-sesame',
+    ownerPassword: 'owner-secret',
+    permissions: { printing: 'highResolution', modifying: true, copying: true, annotating: true, fillingForms: true, contentAccessibility: true, documentAssembly: true },
+  });
   write('password-protected.pdf', await doc.save(), {
     expect: 'password',
     password: 'open-sesame',
@@ -196,6 +255,20 @@ await (async () => {
   body(page, font, ['Anyone can open this; only the owner may change it.']);
   doc.encrypt({ ownerPassword: 'owner-secret', permissions: { printing: 'lowResolution', modifying: false } });
   write('owner-password-only.pdf', await doc.save(), { expect: 'open', pages: 1, note: 'encrypted, empty user password' });
+})();
+
+// 9b. Opens without a password, but its permissions forbid filling it in.
+await (async () => {
+  const { doc, font, bold } = await newDoc('No filling allowed');
+  const page = doc.addPage(SIZES.letter);
+  heading(page, bold, 'Filling not permitted');
+  page.drawText('Name', { x: 72, y: 660, size: 12, font });
+  doc.getForm().createTextField('locked_name').addToPage(page, { x: 180, y: 652, width: 300, height: 24 });
+  doc.encrypt({
+    ownerPassword: 'owner-secret',
+    permissions: { printing: 'highResolution', modifying: false, copying: true, annotating: false, fillingForms: false, contentAccessibility: true, documentAssembly: false },
+  });
+  write('no-fill-permission.pdf', await doc.save(), { expect: 'open', pages: 1, note: 'permissions forbid filling and annotating' });
 })();
 
 // 10. Junk before the header (seen in files from some email gateways).

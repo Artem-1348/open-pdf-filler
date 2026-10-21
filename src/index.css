@@ -563,6 +563,447 @@ select {
   }
 }
 
+/* ---------- Fill & sign (Phase 2) ---------- */
+
+:root {
+  --field-bg: rgba(31, 95, 139, 0.1);
+  --field-border: rgba(31, 95, 139, 0.45);
+  --field-focus: rgba(31, 95, 139, 0.18);
+  --item-outline: #1f5f8b;
+  --ink: #14141f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --item-outline: #6aaee0;
+  }
+}
+
+.fillbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 6px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.fillbar .tools {
+  gap: 2px;
+}
+
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  cursor: pointer;
+}
+
+.tool-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.tool-btn[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.tool-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tool-hint {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* "Tap the page to place it" floats over the page instead of taking a row. */
+.tool-hint.floating {
+  position: fixed;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  z-index: 15;
+  white-space: nowrap;
+}
+
+.fill-notice {
+  order: 3;
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.btn.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Form field controls drawn over the page */
+
+.field-layer,
+.item-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.field-control {
+  position: absolute;
+  pointer-events: auto;
+  margin: 0;
+  padding: 0 2px;
+  border: 1px solid var(--field-border);
+  border-radius: 2px;
+  background: var(--field-bg);
+  color: #000;
+  font-family: Helvetica, Arial, sans-serif;
+  line-height: 1.15;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+textarea.field-control {
+  resize: none;
+  padding-top: 1px;
+}
+
+select.field-control {
+  -webkit-appearance: menulist;
+  appearance: auto;
+  padding: 0;
+}
+
+.field-control:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 0;
+  background: var(--field-focus);
+}
+
+.field-control:disabled {
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+}
+
+.field-control.toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.field-control.radio {
+  border-radius: 50%;
+}
+
+.field-control.sign {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  border-style: dashed;
+}
+
+/* Placed items */
+
+.item {
+  position: absolute;
+  z-index: 1;
+  pointer-events: auto;
+  color: var(--ink);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* A bigger invisible grab area, so small items (a checkmark at phone zoom
+   is ~10px) are easy to touch. Sits behind the item's own content. */
+.item::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  z-index: -1;
+}
+
+.item.selected {
+  outline: 1.5px dashed var(--item-outline);
+  outline-offset: 2px;
+}
+
+.item-text,
+.item-signature-typed {
+  min-width: 1ch;
+  white-space: pre;
+  font-family: Helvetica, Arial, sans-serif;
+  color: var(--ink);
+  outline: none;
+}
+
+.item-text[contenteditable='plaintext-only'],
+.item-text[contenteditable='true'] {
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.item-text:empty::before {
+  content: 'Type here';
+  color: #8a8a8a;
+}
+
+.item-signature-typed {
+  font-style: italic;
+}
+
+.item-signature-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.item svg {
+  display: block;
+}
+
+.item-tools {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  z-index: 5;
+  cursor: default;
+}
+
+.item-tools button {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--bg);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.item-tools button:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.item-tools button.danger {
+  color: #ff9b9b;
+}
+
+.resize-handle {
+  position: absolute;
+  /* Just outside the corner so it never covers a small item. */
+  right: -22px;
+  bottom: -22px;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--item-outline);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+}
+
+.placement-surface {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  cursor: crosshair;
+  touch-action: manipulation;
+}
+
+/* Dialogs */
+
+.dialog-text.small {
+  font-size: 0.88rem;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+
+.choice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.choice:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.choice input {
+  margin-top: 3px;
+}
+
+.choice > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.choice-help {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.signature-dialog {
+  width: min(560px, calc(100% - 24px));
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.tabs [role='tab'] {
+  flex: 1;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.tabs [role='tab'][aria-selected='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+.sig-pad-wrap {
+  position: relative;
+}
+
+.sig-pad {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.sig-pad-line {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 44px;
+  border-bottom: 1px dashed #b5b5b5;
+  pointer-events: none;
+}
+
+.sig-clear {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: #1d1d1b;
+  background: #f1f1ee;
+}
+
+.sig-typed-preview {
+  display: block;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+  font-family: Helvetica, Arial, sans-serif;
+  font-style: italic;
+  font-size: 2rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .fillbar {
+    padding: 4px 8px;
+  }
+
+  .tool-btn {
+    padding: 0 8px;
+  }
+
+  .tool-label {
+    display: none;
+  }
+
+  .fillbar {
+    flex-wrap: wrap;
+  }
+
+  .fillbar .tools {
+    flex: 1;
+  }
+
+  .fillbar .btn {
+    padding: 0 10px;
+  }
+
+  .fillbar .tool-hint:not(.floating) {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .spinner {
     animation-duration: 2.4s;

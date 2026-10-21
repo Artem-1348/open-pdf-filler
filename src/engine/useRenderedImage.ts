@@ -10,6 +10,8 @@ interface RenderRequest {
   // Only pages near the viewport are rendered; others release their bitmap.
   active: boolean;
   thumbnail?: boolean;
+  // false: leave form fields out (the editor draws its own controls).
+  withForms?: boolean;
 }
 
 // Renders a page to an object URL. While a re-render at a new zoom is in
@@ -21,6 +23,7 @@ export function useRenderedImage({
   dpr,
   active,
   thumbnail = false,
+  withForms = true,
 }: RenderRequest): string | null {
   const [url, setUrl] = useState<string | null>(null);
   const shownRef = useRef<string | null>(null);
@@ -45,7 +48,7 @@ export function useRenderedImage({
       if (cancelled) return;
       const task = thumbnail
         ? engine.renderThumbnail(doc, page, { scaleFactor, dpr })
-        : engine.renderPage(doc, page, { scaleFactor, dpr, withAnnotations: true, withForms: true });
+        : engine.renderPage(doc, page, { scaleFactor, dpr, withAnnotations: true, withForms });
       abort = () => task.abort({ code: PdfErrorCode.Cancelled, message: 'superseded' });
       task.wait(
         (blob) => {
@@ -61,7 +64,7 @@ export function useRenderedImage({
       cancelled = true;
       abort?.();
     };
-  }, [doc, page, scaleFactor, dpr, active, thumbnail]);
+  }, [doc, page, scaleFactor, dpr, active, thumbnail, withForms]);
 
   useEffect(
     () => () => {

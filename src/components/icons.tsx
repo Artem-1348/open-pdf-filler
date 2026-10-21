@@ -60,3 +60,36 @@ export const FileIcon = () => (
     <path d="M14 3v5h5M9 13h6M9 17h4" />
   </svg>
 );
+export const TextIcon = () => (
+  <svg {...base}>
+    <path d="M5 6V4h14v2M12 4v16M9 20h6" />
+  </svg>
+);
+export const DateIcon = () => (
+  <svg {...base}>
+    <rect x="3" y="5" width="18" height="16" rx="2" />
+    <path d="M3 10h18M8 3v4M16 3v4" />
+  </svg>
+);
+export const CheckIcon = () => (
+  <svg {...base}>
+    <path d="M4 12.5 9.5 18 20 6" />
+  </svg>
+);
+export const CrossIcon = () => (
+  <svg {...base}>
+    <path d="M6 6l12 12M18 6 6 18" />
+  </svg>
+);
+export const SignIcon = () => (
+  <svg {...base}>
+    <path d="M3 17c3-1 4-6 6-6s0 6 2 6 3-4 5-4 1 4 3 4" />
+    <path d="M3 21h18" />
+  </svg>
+);
+export const SaveIcon = () => (
+  <svg {...base}>
+    <path d="M12 4v11M7 10l5 5 5-5" />
+    <path d="M5 20h14" />
+  </svg>
+);

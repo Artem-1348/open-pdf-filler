@@ -9,19 +9,24 @@ shows its value, change one value, save, reopen. Record **✅ pass**, **❌ fail
 
 ## Phase 2 gate: filled files reopen with every value intact
 
-| Viewer | Platform | Text | Checkbox | Radio | Dropdown | Signature | Version / date | Notes |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Adobe Acrobat Reader | Windows | — | — | — | — | — | | |
-| Adobe Acrobat Reader | macOS | — | — | — | — | — | | |
-| Preview | macOS | — | — | — | — | — | | Known to skip missing appearance streams |
-| Files / Markup | iOS | — | — | — | — | — | | |
-| Google Drive viewer | Android | — | — | — | — | — | | |
-| Adobe Acrobat Reader | Android | — | — | — | — | — | | |
-| Chrome built-in viewer | Desktop | — | — | — | — | — | | |
-| Edge built-in viewer | Windows | — | — | — | — | — | | |
-| Firefox built-in viewer (PDF.js) | Desktop | — | — | — | — | — | | |
-| Okular | Linux | — | — | — | — | — | | |
-| Evince / Papers | Linux | — | — | — | — | — | | |
+Sample files: `npx vitest run src/pdf/viewers.test.ts` writes them to `test-results/gate-samples/`
+(form filled, form flattened, IRS W-9 with signature and date, items on rotated pages, Cyrillic,
+password-protected copy; password `open-sesame`).
+
+| Viewer | Platform | Text | Checkbox | Radio | Dropdown | List | Placed items | How checked / date | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Chrome built-in viewer (PDFium) | Desktop | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Automated, PDFium 2.15 in Node, 2026-10-20 | Same engine as Edge and Android Chrome |
+| Open PDF Filler (PDFium) | All 5 browser profiles | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Automated e2e: save, reopen, compare, 2026-10-20 | |
+| Firefox built-in viewer (PDF.js) | Desktop | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Automated, PDF.js 6.4.299, 2026-10-20 | |
+| Preview (PDFKit) | macOS 15.6.1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Automated, PDFKit via `scripts/check-pdfkit.swift`, 2026-10-20 | Fillable list boxes: Preview draws its own appearance without the selection highlight; value is correct |
+| Files / Markup (PDFKit) | iOS 27.0.1 | — | — | — | — | — | — | Same engine as Preview; manual check pending | |
+| Adobe Acrobat Reader | macOS | — | — | — | — | — | — | Manual, pending (not installed on the test Mac) | |
+| Adobe Acrobat Reader | Windows | — | — | — | — | — | — | Not tested (no device) | |
+| Google Drive viewer | Android | — | — | — | — | — | — | Not tested (no device) | |
+| Adobe Acrobat Reader | Android | — | — | — | — | — | — | Not tested (no device) | |
+| Edge built-in viewer | Windows | — | — | — | — | — | — | Not tested (no device); same engine as Chrome | |
+| Okular | Linux | — | — | — | — | — | — | Not tested (no device) | |
+| Evince / Papers | Linux | — | — | — | — | — | — | Not tested (no device) | |
 
 ## Phase 3 gate: a 20-field form built in the app
 

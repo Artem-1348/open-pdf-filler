@@ -34,7 +34,7 @@ test('toolbar controls fit on one screen width and are big enough to tap', async
   await openCorpusFile(page, 'twenty-pages.pdf');
   await expectDocumentOpen(page, 20);
   const width = page.viewportSize()!.width;
-  for (const id of ['open-button', 'toggle-thumbnails', 'close-button', 'page-input', 'zoom-out', 'zoom-in', 'toggle-search']) {
+  for (const id of ['tool-text', 'tool-date', 'tool-check', 'tool-cross', 'tool-sign', 'save-button', 'open-button', 'toggle-thumbnails', 'close-button', 'page-input', 'zoom-out', 'zoom-in', 'toggle-search']) {
     const box = await page.getByTestId(id).boundingBox();
     expect(box, id).not.toBeNull();
     expect(box!.x + box!.width, id).toBeLessThanOrEqual(width);

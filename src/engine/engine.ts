@@ -10,6 +10,9 @@ import type {
 import pdfiumWasmUrl from '@embedpdf/pdfium/pdfium.wasm?url';
 import { checkPdfBytes } from '../lib/fileCheck';
 import { OpenError, kindFromPdfiumCode } from '../lib/errors';
+import { buildFields } from '../pdf/fields';
+import type { FormFieldInfo } from '../pdf/model';
+import { PdfPermissionFlag } from '@embedpdf/models';
 
 export type { PdfDocumentObject, PdfPageObject, SearchResult };
 
@@ -82,4 +85,37 @@ export async function searchPdf(doc: PdfDocumentObject, keyword: string): Promis
   const engine = await getEngine();
   const result = await engine.searchAllPages(doc, keyword).toPromise();
   return result.results;
+}
+
+export interface FormInfo {
+  fields: FormFieldInfo[];
+  // Pages that have at least one fillable widget; they render without
+  // PDFium's own field drawing so the editor's controls replace it.
+  pagesWithFields: ReadonlySet<number>;
+  canEdit: boolean;
+  permissions: number;
+}
+
+export async function readForm(doc: PdfDocumentObject): Promise<FormInfo> {
+  const engine = await getEngine();
+  const perPage = await Promise.all(
+    doc.pages.map((page) =>
+      engine
+        .getPageAnnoWidgets(doc, page)
+        .toPromise()
+        .catch(() => []),
+    ),
+  );
+  const fields = buildFields(perPage);
+  const pagesWithFields = new Set<number>();
+  for (const f of fields) for (const w of f.widgets) pagesWithFields.add(w.page);
+
+  // Respect "no form filling" permissions (design D8). Unencrypted files
+  // report every permission.
+  const permissions = await engine.getDocUserPermissions(doc).toPromise().catch(() => -1);
+  const canEdit =
+    permissions === -1 ||
+    (permissions & PdfPermissionFlag.FillForms) !== 0 ||
+    (permissions & PdfPermissionFlag.ModifyAnnotations) !== 0;
+  return { fields, pagesWithFields, canEdit, permissions };
 }

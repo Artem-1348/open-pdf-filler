@@ -53,6 +53,12 @@
       "note": "text, checkbox, radio, dropdown fields"
     },
     {
+      "file": "all-field-types.pdf",
+      "expect": "open",
+      "pages": 3,
+      "note": "blank text, multiline, max-length, checkbox, radio, dropdown, multi-select list; rotated pages"
+    },
+    {
       "file": "accented-text.pdf",
       "expect": "open",
       "pages": 1,
@@ -77,6 +83,12 @@
       "expect": "open",
       "pages": 1,
       "note": "encrypted, empty user password"
+    },
+    {
+      "file": "no-fill-permission.pdf",
+      "expect": "open",
+      "pages": 1,
+      "note": "permissions forbid filling and annotating"
     },
     {
       "file": "leading-junk.pdf",
