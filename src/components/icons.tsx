@@ -129,3 +129,9 @@ export const RedoIcon = () => (
     <path d="M20 9H10a6 6 0 0 0 0 12h3" />
   </svg>
 );
+export const WandIcon = () => (
+  <svg {...base}>
+    <path d="m4 20 11-11" />
+    <path d="M15 4v2M19 8h2M18 5l1.5-1.5M12 6l-1-1M18 11l1 1" />
+  </svg>
+);

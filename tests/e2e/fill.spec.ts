@@ -103,6 +103,16 @@ test.describe('existing form fields (FR-3)', () => {
     await expect(field(page, 'name_p90')).toHaveValue('Sideways');
   });
 
+  test('fields on sideways pages are drawn where the PDF puts them', async ({ page }) => {
+    await openCorpusFile(page, 'all-field-types.pdf');
+    await expectDocumentOpen(page, 3);
+    // On the page turned 90°, the 300 x 24 name field shows up tall and thin.
+    const control = field(page, 'name_p90');
+    await control.scrollIntoViewIfNeeded();
+    const box = (await control.boundingBox())!;
+    expect(box.height).toBeGreaterThan(box.width * 5);
+  });
+
   test('the IRS W-9 keeps its name and tax-classification box', async ({ page }, testInfo) => {
     const name = 'topmostSubform[0].Page1[0].f1_01[0]';
     const sCorp = 'topmostSubform[0].Page1[0].Boxes3a-b_ReadOrder[0].c1_1[2]';

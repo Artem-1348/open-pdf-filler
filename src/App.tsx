@@ -8,6 +8,8 @@ import { Viewer, type ViewerHandle } from './components/Viewer';
 import { FileIcon } from './components/icons';
 import {
   closePdf,
+  getPageImage,
+  getTextRuns,
   openPdf,
   readForm,
   searchPdf,
@@ -21,7 +23,9 @@ import { wrapIndex } from './lib/search';
 import { fitWidthZoom, nextZoomStep, prevZoomStep, type ZoomMode } from './lib/zoom';
 import { listenForLaunchedFiles, takeSharedFile } from './openWith';
 import { EditorContext, groupFieldsByPage, type EditorApi } from './editor/EditorContext';
-import { FillBar } from './editor/FillBar';
+import { FillBar, type DetectProgress } from './editor/FillBar';
+import { toSuggestions } from './detect/suggest';
+import { draftsFromFields } from './builder/model';
 import { SaveDialog, type SaveChoice } from './editor/SaveDialog';
 import { SignatureDialog } from './editor/SignatureDialog';
 import { savedFileName } from './editor/fileName';
@@ -89,6 +93,14 @@ export default function App() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [detecting, setDetecting] = useState<DetectProgress | null>(null);
+  // A short visible message (e.g. detection results); it fades after a while.
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!notice) return;
+    const t = window.setTimeout(() => setNotice(null), 6000);
+    return () => window.clearTimeout(t);
+  }, [notice]);
   // An action waiting for "discard unsaved changes?" to be confirmed.
   const [pendingDiscard, setPendingDiscard] = useState<(() => void) | null>(null);
 
@@ -393,6 +405,41 @@ export default function App() {
     }
   };
 
+  // Phase 4: run the detectors and show what they found as suggestions.
+  const runDetection = async () => {
+    if (!current || detecting) return;
+    const { doc: d, file, password } = current;
+    setDetecting({ done: 0, total: d.pageCount });
+    const started = performance.now();
+    try {
+      const { detectFields } = await import('./detect/run');
+      const existing = editor.drafts ?? draftsFromFields(editor.originalFields);
+      const found = await detectFields({
+        bytes: new Uint8Array(await file.arrayBuffer()),
+        password,
+        pageCount: d.pageCount,
+        existing,
+        textRuns: (page) => getTextRuns(d, page),
+        pageImage: (page) => getPageImage(d, page),
+        onProgress: (done, total) => setDetecting({ done, total }),
+      });
+      if (currentRef.current?.doc !== d) return;
+      dispatch({ type: 'set-suggestions', suggestions: toSuggestions(found, existing) });
+      const seconds = ((performance.now() - started) / 1000).toFixed(1);
+      const message = found.length
+        ? `Found ${found.length} possible field${found.length === 1 ? '' : 's'} in ${seconds} s. Review them in the panel.`
+        : `No new fields found (${seconds} s). You can add fields with the tools.`;
+      setStatus(message);
+      setNotice(message);
+    } catch {
+      const message = 'Field detection stopped because of an error. Your form is unchanged.';
+      setStatus(message);
+      setNotice(message);
+    } finally {
+      setDetecting(null);
+    }
+  };
+
   // Keyboard: undo/redo everywhere; Delete, Escape, arrows and duplicate act
   // on the selection. Keys typed into a field are left alone.
   useEffect(() => {
@@ -496,7 +543,13 @@ export default function App() {
 
       {doc && (
         <EditorContext.Provider value={editorApi}>
-          <FillBar dirty={dirty} onSignature={() => void pickSignatureTool()} onSave={() => setSaveOpen(true)} />
+          <FillBar
+            dirty={dirty}
+            onSignature={() => void pickSignatureTool()}
+            onSave={() => setSaveOpen(true)}
+            detecting={detecting}
+            onDetect={() => void runDetection()}
+          />
         </EditorContext.Provider>
       )}
 
@@ -577,6 +630,12 @@ export default function App() {
             setPasswordRequest(null);
           }}
         />
+      )}
+
+      {notice && (
+        <div className="notice-toast" role="status" data-testid="notice" onClick={() => setNotice(null)}>
+          {notice}
+        </div>
       )}
 
       {signatureRequest && <SignatureDialog previous={lastSignature} onDone={signatureRequest} />}

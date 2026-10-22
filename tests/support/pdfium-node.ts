@@ -33,7 +33,7 @@ export async function readFieldsWithPdfium(bytes: Uint8Array, password?: string)
   const doc = await openWithPdfium(bytes, password);
   const perPage = [];
   for (const page of doc.pages) perPage.push(await e.getPageAnnoWidgets(doc, page).toPromise());
-  return { doc, fields: buildFields(perPage) };
+  return { doc, fields: buildFields(perPage, doc.pages) };
 }
 
 export async function pageText(doc: PdfDocumentObject, pageIndex: number): Promise<string> {

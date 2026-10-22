@@ -20,8 +20,15 @@ export type Tool =
 
 export type Mode = 'fill' | 'edit';
 
+// A field a detector found (Phase 4), waiting to be accepted or rejected.
+export interface Suggestion extends FieldDraft {
+  confidence: number;
+  detector: 'flattened' | 'rules' | 'model';
+}
+
 interface Snapshot {
   drafts: FieldDraft[] | null;
+  suggestions: Suggestion[];
   customOrder: boolean;
   values: Map<string, FieldValue>;
   items: PlacedItem[];
@@ -51,6 +58,9 @@ export interface EditorState {
   tool: Tool | null;
   // Edit form mode.
   selection: string[];
+  // Auto-detect suggestions, and the confidence below which they're hidden.
+  suggestions: Suggestion[];
+  minConfidence: number;
   buildTool: CreatableKind | null;
   // Undo/redo. Consecutive edits with the same key (typing in one field,
   // dragging one box) count as one step.
@@ -93,6 +103,10 @@ export type EditorAction =
   | { type: 'reorder-drafts'; ids: string[] }
   | { type: 'reset-order' }
   | { type: 'select-drafts'; ids: string[] }
+  | { type: 'set-suggestions'; suggestions: Suggestion[] }
+  | { type: 'accept-suggestions'; ids: string[] }
+  | { type: 'reject-suggestions'; ids: string[] }
+  | { type: 'set-min-confidence'; value: number }
   | { type: 'undo' }
   | { type: 'redo' }
   | { type: 'saved' };
@@ -111,6 +125,8 @@ export const emptyEditor: EditorState = {
   editingId: null,
   tool: null,
   selection: [],
+  suggestions: [],
+  minConfidence: 0.5,
   buildTool: null,
   past: [],
   future: [],
@@ -122,6 +138,7 @@ export const emptyEditor: EditorState = {
 
 const snapshot = (s: EditorState): Snapshot => ({
   drafts: s.drafts,
+  suggestions: s.suggestions,
   customOrder: s.customOrder,
   values: s.values,
   items: s.items,
@@ -141,8 +158,8 @@ function withDrafts(state: EditorState, drafts: FieldDraft[] | null, customOrder
 }
 
 function restore(state: EditorState, snap: Snapshot): EditorState {
-  const next = withDrafts({ ...state, values: snap.values, items: snap.items }, snap.drafts, snap.customOrder);
-  const ids = new Set(next.drafts?.map((d) => d.id) ?? []);
+  const next = withDrafts({ ...state, values: snap.values, items: snap.items, suggestions: snap.suggestions }, snap.drafts, snap.customOrder);
+  const ids = new Set([...(next.drafts?.map((d) => d.id) ?? []), ...snap.suggestions.map((d) => d.id)]);
   const itemIds = new Set(next.items.map((i) => i.id));
   return {
     ...next,
@@ -289,12 +306,20 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         return patch ? { ...d, ...patch } : d;
       });
       const values = migrateValues(state.values, state.drafts, drafts);
-      return withDrafts({ ...state, ...record(state, action.key ?? null), values }, drafts);
+      // Suggestions can be moved and resized before they're accepted.
+      const suggestions = state.suggestions.some((d) => patches.has(d.id))
+        ? state.suggestions.map((d) => {
+            const patch = patches.get(d.id);
+            return patch ? { ...d, ...patch } : d;
+          })
+        : state.suggestions;
+      return withDrafts({ ...state, ...record(state, action.key ?? null), values, suggestions }, drafts);
     }
     case 'remove-drafts': {
       if (!state.drafts) return state;
       const gone = new Set(action.ids);
-      const next = withDrafts({ ...state, ...record(state, null) }, state.drafts.filter((d) => !gone.has(d.id)));
+      const suggestions = state.suggestions.filter((d) => !gone.has(d.id));
+      const next = withDrafts({ ...state, ...record(state, null), suggestions }, state.drafts.filter((d) => !gone.has(d.id)));
       return { ...next, selection: state.selection.filter((id) => !gone.has(id)) };
     }
     case 'reorder-drafts': {
@@ -308,6 +333,39 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return withDrafts({ ...state, ...record(state, null) }, state.drafts, false);
     case 'select-drafts':
       return { ...state, selection: action.ids, lastKey: null };
+    case 'set-suggestions': {
+      // Suggestions are reviewed in Edit form, which needs the drafts.
+      const base = state.drafts ? state : editorReducer(state, { type: 'set-mode', mode: 'edit' });
+      return { ...base, ...record(base, null), mode: 'edit', suggestions: action.suggestions, selection: [] };
+    }
+    case 'accept-suggestions': {
+      const ids = new Set(action.ids);
+      const accepted = state.suggestions.filter((d) => ids.has(d.id));
+      if (!accepted.length) return state;
+      const taken = new Set((state.drafts ?? []).map((d) => d.name));
+      const drafts: FieldDraft[] = accepted.map(({ confidence: _c, detector: _d, ...d }) => {
+        let name = d.name;
+        for (let n = 2; taken.has(name); n++) name = `${d.name} ${n}`;
+        taken.add(name);
+        return { ...d, name };
+      });
+      const next = withDrafts(
+        { ...state, ...record(state, null), suggestions: state.suggestions.filter((d) => !ids.has(d.id)) },
+        [...(state.drafts ?? []), ...drafts],
+      );
+      return { ...next, selection: drafts.length === 1 ? [drafts[0].id] : [] };
+    }
+    case 'reject-suggestions': {
+      const ids = new Set(action.ids);
+      return {
+        ...state,
+        ...record(state, null),
+        suggestions: state.suggestions.filter((d) => !ids.has(d.id)),
+        selection: state.selection.filter((id) => !ids.has(id)),
+      };
+    }
+    case 'set-min-confidence':
+      return { ...state, minConfidence: action.value };
     case 'undo': {
       const prev = state.past[state.past.length - 1];
       if (!prev) return state;
@@ -405,4 +463,9 @@ export function todayText(date = new Date(), locale?: string): string {
 export function structureChanges(state: EditorState) {
   if (!state.drafts || state.drafts === state.baseDrafts) return undefined;
   return { drafts: state.drafts, originalFields: state.originalFields };
+}
+
+// Suggestions shown with the current confidence filter.
+export function visibleSuggestions(state: EditorState): Suggestion[] {
+  return state.suggestions.filter((d) => d.confidence >= state.minConfidence);
 }
