@@ -44,3 +44,22 @@ describe('view <-> PDF coordinates', () => {
     expect(normalizeRotation(360)).toBe(0);
   });
 });
+
+describe('widget boxes on rotated pages (PDFium quirk)', () => {
+  it('rebuilds the true displayed box for every rotation', async () => {
+    const { widgetBox } = await import('./fields');
+    // A 200 x 30 field at x=100, y=600 (PDF space) on a 612 x 792 page, as
+    // PDFium reports it for each rotation, and the box actually displayed.
+    const cases = [
+      { rotation: 0, size: { width: 612, height: 792 }, pdfium: [100, 162, 200, 30], truth: { x: 100, y: 162, width: 200, height: 30 } },
+      { rotation: 1, size: { width: 792, height: 612 }, pdfium: [630, 100, 200, 30], truth: { x: 600, y: 100, width: 30, height: 200 } },
+      { rotation: 2, size: { width: 612, height: 792 }, pdfium: [512, 630, 200, 30], truth: { x: 312, y: 600, width: 200, height: 30 } },
+      { rotation: 3, size: { width: 792, height: 612 }, pdfium: [162, 512, 200, 30], truth: { x: 162, y: 312, width: 30, height: 200 } },
+    ];
+    for (const c of cases) {
+      const [x, y, width, height] = c.pdfium;
+      const box = widgetBox({ origin: { x, y }, size: { width, height } }, { rotation: c.rotation, size: c.size });
+      expect(box, `rotation ${c.rotation * 90}`).toEqual(c.truth);
+    }
+  });
+});

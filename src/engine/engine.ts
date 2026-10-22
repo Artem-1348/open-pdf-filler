@@ -106,7 +106,7 @@ export async function readForm(doc: PdfDocumentObject): Promise<FormInfo> {
         .catch(() => []),
     ),
   );
-  const fields = buildFields(perPage);
+  const fields = buildFields(perPage, doc.pages);
   const pagesWithFields = new Set<number>();
   for (const f of fields) for (const w of f.widgets) pagesWithFields.add(w.page);
 

@@ -5,6 +5,7 @@ import {
   PDF_FORM_FIELD_TYPE,
   type PdfWidgetAnnoObject,
 } from '@embedpdf/models';
+import { normalizeRotation, pdfRectToView, viewToPdf, type Box, type PageFrame } from './geometry';
 import type { FieldKind, FieldValue, FormFieldInfo } from './model';
 
 function kindOf(type: PDF_FORM_FIELD_TYPE): FieldKind | null {
@@ -30,7 +31,36 @@ function kindOf(type: PDF_FORM_FIELD_TYPE): FieldKind | null {
 
 const has = (flags: number, flag: number) => (flags & flag) === flag;
 
-export function buildFields(widgetsByPage: ReadonlyArray<ReadonlyArray<PdfWidgetAnnoObject>>): FormFieldInfo[] {
+export interface PageInfo {
+  // As displayed (after rotation), in points.
+  size: { width: number; height: number };
+  // Quarter turns clockwise (PDFium's Rotation enum: 0–3).
+  rotation: number;
+}
+
+// PDFium reports a widget's rectangle on a rotated page as the rotated
+// position of its top-left corner, but with the unrotated width and height.
+// Rebuild the true box as displayed.
+export function widgetBox(rect: PdfWidgetAnnoObject['rect'], page?: PageInfo): Box {
+  const box = { x: rect.origin.x, y: rect.origin.y, width: rect.size.width, height: rect.size.height };
+  const rotation = normalizeRotation(((page?.rotation ?? 0) % 4) * 90);
+  if (!page || rotation === 0) return box;
+  const sideways = rotation === 90 || rotation === 270;
+  const frame: PageFrame = {
+    x: 0,
+    y: 0,
+    width: sideways ? page.size.height : page.size.width,
+    height: sideways ? page.size.width : page.size.height,
+    rotation,
+  };
+  const topLeft = viewToPdf(frame, { x: box.x, y: box.y });
+  return pdfRectToView(frame, { x: topLeft.x, y: topLeft.y - box.height, width: box.width, height: box.height });
+}
+
+export function buildFields(
+  widgetsByPage: ReadonlyArray<ReadonlyArray<PdfWidgetAnnoObject>>,
+  pages?: ReadonlyArray<PageInfo>,
+): FormFieldInfo[] {
   const byName = new Map<string, FormFieldInfo>();
   // Raw field values, to work out which toggle widget is on once all are known.
   const rawValue = new Map<string, string>();
@@ -72,7 +102,7 @@ export function buildFields(widgetsByPage: ReadonlyArray<ReadonlyArray<PdfWidget
       }
       info.widgets.push({
         page,
-        box: { x: w.rect.origin.x, y: w.rect.origin.y, width: w.rect.size.width, height: w.rect.size.height },
+        box: widgetBox(w.rect, pages?.[page]),
         exportValue: w.exportValue ?? '',
       });
     }
