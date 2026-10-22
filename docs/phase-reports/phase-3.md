@@ -1,15 +1,15 @@
 # Phase 3 — Manual form builder (FR-5): test report
 
-**Date:** 2026-10-21 · **Gate:** a 20-field form built in the app fills correctly in the same
+**Date:** 2026-10-22 · **Gate:** a 20-field form built in the app fills correctly in the same
 five viewers (Acrobat, Preview, Chrome, iOS, Android); Tab moves through fields in page order.
 
-## Result: automated part passed; iPhone check pending; Acrobat and Android as in Phase 2
+## Result: gate passed (Acrobat deferred to Phase 6; no Android device)
 
 | Gate viewer | Engine | 20 fields fill | Tab order |
 | --- | --- | --- | --- |
 | Chrome | PDFium | ✅ automated (built in the app, filled, saved, reopened) | ✅ in-app Tab walk, all 5 browser profiles |
 | Preview | PDFKit | ✅ automated | ✅ widgets listed in page order |
-| iOS | PDFKit (same engine) | ✅ via the engine; ⏳ manual check on iPhone | ✅ via the engine |
+| iOS | PDFKit (same engine) | ✅ via the engine; ✅ manual on iPhone 17 Pro Max: built, filled and saved a form, 2026-10-22 | ✅ via the engine |
 | Firefox (extra) | PDF.js | ✅ automated | ✅ widgets in page order |
 | Acrobat | Adobe | ⏸ deferred to Phase 6 (not installed) | ⏸ |
 | Android | PDFium | ✅ engine; no device | ✅ engine |
@@ -60,9 +60,9 @@ No open P1 or P2 bugs.
 
 | Item | Status |
 | --- | --- |
-| Acceptance criteria pass | ⏳ automated ✅; iPhone check pending |
-| Automated tests green in CI | ⏳ PR |
+| Acceptance criteria pass | ✅ |
+| Automated tests green in CI | ✅ PR #2 and `main` |
 | No open P1/P2 bugs | ✅ |
 | One-page test report | ✅ this file |
-| Demo on a laptop and a phone | ⏳ |
-| Tagged release v0.3 | ⏳ |
+| Demo on a laptop and a phone | ✅ |
+| Tagged release v0.3 | ✅ v0.3.0 |
