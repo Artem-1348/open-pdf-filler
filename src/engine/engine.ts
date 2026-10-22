@@ -119,3 +119,25 @@ export async function readForm(doc: PdfDocumentObject): Promise<FormInfo> {
     (permissions & PdfPermissionFlag.ModifyAnnotations) !== 0;
   return { fields, pagesWithFields, canEdit, permissions };
 }
+
+// Page text with positions, for naming detected fields (Phase 4).
+export async function getTextRuns(doc: PdfDocumentObject, pageIndex: number) {
+  const engine = await getEngine();
+  // Text runs (not text rects): their text is clean, without stray characters.
+  const result = await engine.getPageTextRuns(doc, doc.pages[pageIndex]).toPromise().catch(() => ({ runs: [] }));
+  return result.runs.map((r) => ({
+    text: r.text,
+    box: { x: r.rect.origin.x, y: r.rect.origin.y, width: r.rect.size.width, height: r.rect.size.height },
+  }));
+}
+
+// The page in grey at `scale` pixels per point, without form fields, for the
+// rule-based detector.
+export async function getPageImage(doc: PdfDocumentObject, pageIndex: number, scale = 2) {
+  const engine = await getEngine();
+  const img = await engine
+    .renderPageRaw(doc, doc.pages[pageIndex], { scaleFactor: scale, dpr: 1, withAnnotations: false, withForms: false })
+    .toPromise();
+  const { toGray } = await import('../detect/rules');
+  return { width: img.width, height: img.height, scale, gray: toGray(img.data, img.width, img.height) };
+}

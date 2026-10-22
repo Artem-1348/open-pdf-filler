@@ -14,6 +14,8 @@ export interface DetectedField {
   detector: DetectorId;
   // The label next to it, from the page's text, if found (FR-7).
   label?: string;
+  // Which rule produced it (detector 1), for later clean-up passes.
+  pattern?: 'box' | 'cell-bottom' | 'cell-right' | 'underline' | 'currency' | 'square' | 'digits';
 }
 
 // Kind from shape alone; labels can refine it later.

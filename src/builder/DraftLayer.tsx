@@ -2,6 +2,7 @@
 // dragged, resized and placed. Pointer events cover mouse, pen and touch.
 import { memo, useRef, type PointerEvent } from 'react';
 import { useEditor } from '../editor/EditorContext';
+import { visibleSuggestions, type Suggestion } from '../editor/state';
 import { clampToPage, newDraft, type FieldDraft } from './model';
 
 interface Props {
@@ -29,6 +30,7 @@ const KIND_LABEL: Record<FieldDraft['kind'], string> = {
 export const DraftLayer = memo(function DraftLayer({ page, scale, pageWidth, pageHeight }: Props) {
   const { state, dispatch } = useEditor();
   const drafts = (state.drafts ?? []).filter((d) => d.page === page);
+  const suggestions = visibleSuggestions(state).filter((d) => d.page === page);
   const pageSize = { width: pageWidth, height: pageHeight };
 
   // Tap on the page: place the picked field type, or clear the selection.
@@ -54,11 +56,24 @@ export const DraftLayer = memo(function DraftLayer({ page, scale, pageWidth, pag
       {drafts.map((d) => (
         <DraftBox key={d.id} draft={d} scale={scale} pageSize={pageSize} />
       ))}
+      {suggestions.map((d) => (
+        <DraftBox key={d.id} draft={d} suggestion={d} scale={scale} pageSize={pageSize} />
+      ))}
     </div>
   );
 });
 
-function DraftBox({ draft, scale, pageSize }: { draft: FieldDraft; scale: number; pageSize: { width: number; height: number } }) {
+function DraftBox({
+  draft,
+  suggestion,
+  scale,
+  pageSize,
+}: {
+  draft: FieldDraft;
+  suggestion?: Suggestion;
+  scale: number;
+  pageSize: { width: number; height: number };
+}) {
   const { state, dispatch } = useEditor();
   const selected = state.selection.includes(draft.id);
   const gesture = useRef<{
@@ -84,7 +99,7 @@ function DraftBox({ draft, scale, pageSize }: { draft: FieldDraft; scale: number
       selection = [draft.id];
       dispatch({ type: 'select-drafts', ids: selection });
     }
-    const all = state.drafts ?? [];
+    const all = [...(state.drafts ?? []), ...state.suggestions];
     const boxes = new Map(all.filter((d) => selection.includes(d.id)).map((d) => [d.id, d.box]));
     const g = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: false, boxes, timer: null as number | null, multi: false };
     // Long-press (touch) adds this box to the selection, like Shift-click.
@@ -129,11 +144,11 @@ function DraftBox({ draft, scale, pageSize }: { draft: FieldDraft; scale: number
   };
 
   const label = draft.kind === 'radio' ? `${draft.name}: ${draft.exportValue}` : draft.name;
-  const clash = !!state.drafts && isClashing(draft, state.drafts);
+  const clash = !suggestion && !!state.drafts && isClashing(draft, state.drafts);
 
   return (
     <div
-      className={`draft draft-${draft.kind}${selected ? ' selected' : ''}${clash ? ' clash' : ''}`}
+      className={`draft draft-${draft.kind}${selected ? ' selected' : ''}${clash ? ' clash' : ''}${suggestion ? ' suggested' : ''}`}
       style={{
         left: draft.box.x * scale,
         top: draft.box.y * scale,
@@ -143,9 +158,9 @@ function DraftBox({ draft, scale, pageSize }: { draft: FieldDraft; scale: number
       role="button"
       tabIndex={0}
       aria-pressed={selected}
-      aria-label={`${KIND_LABEL[draft.kind]} field ${label}`}
+      aria-label={`${suggestion ? 'Suggested ' : ''}${KIND_LABEL[draft.kind]} field ${label}`}
       title={label}
-      data-testid="draft"
+      data-testid={suggestion ? 'suggestion' : 'draft'}
       data-draft={draft.name}
       data-kind={draft.kind}
       onPointerDown={onPointerDown}
@@ -157,6 +172,11 @@ function DraftBox({ draft, scale, pageSize }: { draft: FieldDraft; scale: number
       }}
     >
       <span className="draft-label">{draft.kind === 'checkbox' || draft.kind === 'radio' ? '' : label}</span>
+      {suggestion && (
+        <span className="confidence" aria-hidden="true">
+          {Math.round(suggestion.confidence * 100)}
+        </span>
+      )}
       {selected && state.selection.length === 1 && <ResizeHandle draft={draft} scale={scale} pageSize={pageSize} />}
     </div>
   );

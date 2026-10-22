@@ -14,18 +14,27 @@ import {
   TextFieldIcon,
   TextIcon,
   UndoIcon,
+  WandIcon,
 } from '../components/icons';
 import type { CreatableKind } from '../builder/model';
 import { useEditor } from './EditorContext';
 import { canRedo, canUndo, type Tool } from './state';
 
+export interface DetectProgress {
+  done: number;
+  total: number;
+}
+
 interface Props {
   dirty: boolean;
   onSignature(): void;
   onSave(): void;
+  // Auto-detect (Phase 4): null when not running.
+  detecting: DetectProgress | null;
+  onDetect(): void;
 }
 
-export function FillBar({ dirty, onSignature, onSave }: Props) {
+export function FillBar({ dirty, onSignature, onSave, detecting, onDetect }: Props) {
   const { state, dispatch } = useEditor();
   const active = state.tool?.kind ?? null;
   const pick = (tool: Tool) => dispatch({ type: 'set-tool', tool: active === tool.kind ? null : tool });
@@ -77,6 +86,10 @@ export function FillBar({ dirty, onSignature, onSave }: Props) {
           <ToolButton label="Signature" active={build === 'signature'} disabled={false} onClick={() => pickField('signature')} testId="field-tool-signature">
             <SignIcon />
           </ToolButton>
+          <span className="tool-divider" aria-hidden="true" />
+          <ToolButton label={detecting ? 'Detecting…' : 'Detect fields'} active={!!detecting} disabled={!!detecting} onClick={onDetect} testId="detect-button">
+            <WandIcon />
+          </ToolButton>
         </div>
       ) : (
       <div className="toolbar-group tools">
@@ -109,7 +122,12 @@ export function FillBar({ dirty, onSignature, onSave }: Props) {
         </p>
       )}
       <div className="toolbar-group">
-        {(state.tool || build) && (
+        {detecting && (
+          <span className="tool-hint floating" role="status" data-testid="detect-progress">
+            Looking for fields… page {Math.min(detecting.done + 1, detecting.total)} of {detecting.total}
+          </span>
+        )}
+        {!detecting && (state.tool || build) && (
           <span className="tool-hint floating" role="status" data-testid="tool-hint">
             {build ? 'Tap the page to add the field' : state.tool?.kind === 'text' ? 'Tap where the text should start' : 'Tap the page to place it'}
           </span>

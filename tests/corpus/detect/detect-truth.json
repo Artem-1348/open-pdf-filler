@@ -1,0 +1,567 @@
+{
+  "flattened-fillable-form.pdf": {
+    "note": "fillable-form.pdf flattened by PDFium",
+    "fields": [
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 179.5,
+          "y": 115.5,
+          "width": 301,
+          "height": 25
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 179.5,
+          "y": 169.5,
+          "width": 19,
+          "height": 19
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 179.5,
+          "y": 219.5,
+          "width": 19,
+          "height": 19
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 259.5,
+          "y": 219.5,
+          "width": 19,
+          "height": 19
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 179.5,
+          "y": 265.5,
+          "width": 201,
+          "height": 25
+        }
+      }
+    ]
+  },
+  "flat-drawn-form.pdf": {
+    "note": "flat form drawn with common patterns",
+    "fields": [
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 130,
+          "y": 74,
+          "width": 200,
+          "height": 16
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 130,
+          "y": 104,
+          "width": 200,
+          "height": 16
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 130,
+          "y": 134,
+          "width": 200,
+          "height": 16
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 420,
+          "y": 190,
+          "width": 150,
+          "height": 20
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 420,
+          "y": 218,
+          "width": 150,
+          "height": 20
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 420,
+          "y": 246,
+          "width": 150,
+          "height": 20
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 50,
+          "y": 303,
+          "width": 280,
+          "height": 21
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 50,
+          "y": 337,
+          "width": 280,
+          "height": 21
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 50,
+          "y": 380,
+          "width": 11,
+          "height": 11
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 170,
+          "y": 380,
+          "width": 11,
+          "height": 11
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 290,
+          "y": 380,
+          "width": 11,
+          "height": 11
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 410,
+          "y": 380,
+          "width": 11,
+          "height": 11
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 50,
+          "y": 440,
+          "width": 180,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 230,
+          "y": 440,
+          "width": 150,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 380,
+          "y": 440,
+          "width": 180,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 50,
+          "y": 462,
+          "width": 180,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 230,
+          "y": 462,
+          "width": 150,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 380,
+          "y": 462,
+          "width": 180,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 210,
+          "y": 516,
+          "width": 120,
+          "height": 16
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 210,
+          "y": 542,
+          "width": 120,
+          "height": 16
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 360,
+          "y": 528,
+          "width": 42,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 414,
+          "y": 528,
+          "width": 28,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 454,
+          "y": 528,
+          "width": 56,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 110,
+          "y": 634,
+          "width": 220,
+          "height": 16
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 390,
+          "y": 634,
+          "width": 170,
+          "height": 16
+        }
+      }
+    ]
+  },
+  "flat-drawn-scan.pdf": {
+    "note": "flat-drawn-form.pdf as an image only",
+    "fields": [
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 130,
+          "y": 74,
+          "width": 200,
+          "height": 16
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 130,
+          "y": 104,
+          "width": 200,
+          "height": 16
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 130,
+          "y": 134,
+          "width": 200,
+          "height": 16
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 420,
+          "y": 190,
+          "width": 150,
+          "height": 20
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 420,
+          "y": 218,
+          "width": 150,
+          "height": 20
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 420,
+          "y": 246,
+          "width": 150,
+          "height": 20
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 50,
+          "y": 303,
+          "width": 280,
+          "height": 21
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 50,
+          "y": 337,
+          "width": 280,
+          "height": 21
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 50,
+          "y": 380,
+          "width": 11,
+          "height": 11
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 170,
+          "y": 380,
+          "width": 11,
+          "height": 11
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 290,
+          "y": 380,
+          "width": 11,
+          "height": 11
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 410,
+          "y": 380,
+          "width": 11,
+          "height": 11
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 50,
+          "y": 440,
+          "width": 180,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 230,
+          "y": 440,
+          "width": 150,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 380,
+          "y": 440,
+          "width": 180,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 50,
+          "y": 462,
+          "width": 180,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 230,
+          "y": 462,
+          "width": 150,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 380,
+          "y": 462,
+          "width": 180,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 210,
+          "y": 516,
+          "width": 120,
+          "height": 16
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 210,
+          "y": 542,
+          "width": 120,
+          "height": 16
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 360,
+          "y": 528,
+          "width": 42,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 414,
+          "y": 528,
+          "width": 28,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 454,
+          "y": 528,
+          "width": 56,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 110,
+          "y": 634,
+          "width": 220,
+          "height": 16
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 390,
+          "y": 634,
+          "width": 170,
+          "height": 16
+        }
+      }
+    ]
+  }
+}
