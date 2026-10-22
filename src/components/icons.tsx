@@ -93,3 +93,39 @@ export const SaveIcon = () => (
     <path d="M5 20h14" />
   </svg>
 );
+export const TextFieldIcon = () => (
+  <svg {...base}>
+    <rect x="3" y="7" width="18" height="10" rx="1.5" />
+    <path d="M7 10v4" />
+  </svg>
+);
+export const CheckboxIcon = () => (
+  <svg {...base}>
+    <rect x="4" y="4" width="16" height="16" rx="2" />
+    <path d="m8 12 3 3 5-6" />
+  </svg>
+);
+export const RadioIcon = () => (
+  <svg {...base}>
+    <circle cx="12" cy="12" r="8" />
+    <circle cx="12" cy="12" r="3" fill="currentColor" />
+  </svg>
+);
+export const DropdownIcon = () => (
+  <svg {...base}>
+    <rect x="3" y="7" width="18" height="10" rx="1.5" />
+    <path d="m14 11 2 2 2-2" />
+  </svg>
+);
+export const UndoIcon = () => (
+  <svg {...base}>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
+  </svg>
+);
+export const RedoIcon = () => (
+  <svg {...base}>
+    <path d="m15 14 5-5-5-5" />
+    <path d="M20 9H10a6 6 0 0 0 0 12h3" />
+  </svg>
+);

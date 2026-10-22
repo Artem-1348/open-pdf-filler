@@ -60,6 +60,8 @@ for arg in args.dropFirst() {
                 fields.append(FieldReport(name: name, type: "choice", value: a.widgetStringValue ?? "", page: i))
             case .text:
                 fields.append(FieldReport(name: name, type: "text", value: a.widgetStringValue ?? "", page: i))
+            case .signature:
+                fields.append(FieldReport(name: name, type: "signature", value: "", page: i))
             default:
                 break
             }

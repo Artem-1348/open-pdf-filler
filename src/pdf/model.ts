@@ -15,6 +15,11 @@ export interface FormFieldInfo {
   name: string;
   // Human-readable label: the field's tooltip (/TU) if it has one.
   label: string;
+  // The tooltip itself, unshortened.
+  tooltip?: string;
+  // A text field the form builder marked as a date (Phase 3).
+  isDate?: boolean;
+  dateFormat?: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD';
   kind: FieldKind;
   widgets: WidgetInfo[];
   options: string[];

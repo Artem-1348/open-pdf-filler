@@ -1,6 +1,7 @@
 // Editable HTML controls laid over a page's form fields. The page image is
 // rendered without PDFium's own field drawing, so these replace it.
 import { memo, type CSSProperties } from 'react';
+import { formatToIso, isoToFormat } from '../builder/dates';
 import { autoFieldFontSize } from '../pdf/layout';
 import type { FieldValue, FormFieldInfo } from '../pdf/model';
 import { initialBox, newItemId } from './state';
@@ -54,6 +55,24 @@ function FieldControl({ entry, scale }: { entry: FieldOnPage; scale: number }) {
     case 'text': {
       const text = value.kind === 'text' ? value.text : '';
       const onChange = (t: string) => set({ kind: 'text', text: t });
+      // Date fields made by the form builder get the system date picker;
+      // text that isn't a date in the field's format stays editable as text.
+      if (field.isDate) {
+        const format = field.dateFormat ?? 'MM/DD/YYYY';
+        const iso = formatToIso(text, format);
+        if (iso || !text) {
+          return (
+            <input
+              {...common}
+              type="date"
+              className="field-control date"
+              style={{ ...style, fontSize: fontPx }}
+              value={iso}
+              onChange={(e) => onChange(isoToFormat(e.target.value, format))}
+            />
+          );
+        }
+      }
       return field.multiline ? (
         <textarea
           {...common}
@@ -84,6 +103,8 @@ function FieldControl({ entry, scale }: { entry: FieldOnPage; scale: number }) {
         <button
           {...common}
           type="button"
+          // Safari skips buttons on Tab unless they ask to be focusable.
+          tabIndex={0}
           role={field.kind}
           aria-checked={on}
           className={`field-control toggle ${field.kind}${on ? ' on' : ''}`}
@@ -157,7 +178,7 @@ function FieldControl({ entry, scale }: { entry: FieldOnPage; scale: number }) {
         dispatch({ type: 'place', item: { id: newItemId(), page: widget.page, kind: 'signature', box: fitted, signature } });
       };
       return (
-        <button {...common} type="button" className="field-control sign" style={style} onClick={sign}>
+        <button {...common} type="button" tabIndex={0} className="field-control sign" style={style} onClick={sign}>
           Sign here
         </button>
       );
