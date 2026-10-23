@@ -15,6 +15,15 @@ export interface EditorApi {
   fieldsByPage: ReadonlyMap<number, FieldOnPage[]>;
   // Opens the signature pad; resolves with the signature, or null if cancelled.
   requestSignature(): Promise<SignatureContent | null>;
+  // Phones: text fields are typed into an input bar above the keyboard.
+  touchInput: boolean;
+  activeField: FieldRef | null;
+  openFieldInput(field: FieldRef | null): void;
+}
+
+export interface FieldRef {
+  name: string;
+  widgetIndex: number;
 }
 
 export const EditorContext = createContext<EditorApi | null>(null);

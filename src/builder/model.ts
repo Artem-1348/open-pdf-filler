@@ -116,6 +116,8 @@ export function fieldsFromDrafts(
         maxLen: d.maxLen,
         fontSize: d.fontSize,
         isDate: d.kind === 'date',
+        // New checkboxes are saved with an X; existing ones keep their mark.
+        checkStyle: src && d.source?.name === src.name ? src.checkStyle : 'cross',
         dateFormat: d.dateFormat,
         initial: sameKind ? src.initial : emptyValue(kind),
       };

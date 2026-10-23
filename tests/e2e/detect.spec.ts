@@ -1,7 +1,7 @@
 // Phase 4 (FR-6, FR-7): find fields automatically, review them, keep the
 // good ones, and fill them.
 import { expect, test, type Page } from '@playwright/test';
-import { expectDocumentOpen, gotoApp } from './helpers';
+import { expectDocumentOpen, gotoApp, typeInto, expectFieldText } from './helpers';
 
 const DIR = 'tests/corpus/detect/';
 
@@ -39,7 +39,7 @@ test('finds fields on a flat form, names them from labels, and they can be fille
 
   await page.getByTestId('accept-all').click();
   await page.getByTestId('mode-fill').click();
-  await page.locator('[data-field="Full name"]').fill('Ada Lovelace');
+  await typeInto(page, page.locator('[data-field="Full name"]'), 'Ada Lovelace');
   await page.locator('[data-field="Yes"]').click();
   await page.getByTestId('save-button').click();
   const download = page.waitForEvent('download');
@@ -50,7 +50,7 @@ test('finds fields on a flat form, names them from labels, and they can be fille
 
   await page.getByTestId('file-input').setInputFiles(path);
   await expect(page.getByTestId('status')).toContainText('form fields');
-  await expect(page.locator('[data-field="Full name"]')).toHaveValue('Ada Lovelace');
+  await expectFieldText(page.locator('[data-field="Full name"]'), 'Ada Lovelace');
   await expect(page.locator('[data-field="Yes"]')).toHaveAttribute('aria-checked', 'true');
 });
 
@@ -67,14 +67,16 @@ test('suggestions can be reviewed one at a time, filtered, or rejected', async (
 
   // Change one suggestion's type, then accept just that one.
   await page.locator('[data-draft="Full name"]').click();
+  // Phones keep the panel folded for suggestions (keep/remove is on the page).
+  await openPanel(page);
   await expect(page.getByTestId('suggestion-props')).toBeVisible();
   await page.getByTestId('suggestion-kind').selectOption('date');
   await page.getByTestId('accept-suggestion').click();
   await expect(page.locator('[data-testid="draft"][data-draft="Full name"]')).toHaveAttribute('data-kind', 'date');
 
-  // Reject one.
+  // Remove one with the button on the box.
   await page.locator('[data-draft="Email"]').click();
-  await page.getByTestId('reject-suggestion').click();
+  await page.getByTestId('remove-suggestion').click();
   await expect(page.locator('[data-draft="Email"]')).toHaveCount(0);
 
   // The confidence filter hides the less certain ones.

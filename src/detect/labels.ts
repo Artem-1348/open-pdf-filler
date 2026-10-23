@@ -24,6 +24,7 @@ export function cleanLabel(raw: string): string {
     .join('');
   s = s.replace(/_{2,}/g, ' ').replace(/\.{3,}/g, ' ');
   s = s.replace(/^[\s\d]*[.)]\s+/, ''); // "1. Name" → "Name"
+  s = s.replace(/^\d{1,2}[a-z]?\s+(?=\p{L})/u, ''); // "1 Name", "3a Check" → "Name", "Check"
   s = s.replace(/[\s:;,.(\-–—_*]+$/, '').replace(/^[\s:;,.)\-–—_*]+/, '');
   s = s.replace(/\s+/g, ' ').trim();
   if (s.length > MAX_LABEL_LENGTH) s = `${s.slice(0, MAX_LABEL_LENGTH - 1).trimEnd()}…`;
@@ -62,8 +63,36 @@ export function findLabel(field: Box, kind: DetectedField['kind'], runs: Readonl
     .map((run) => ({ run, gap: field.y - (run.box.y + run.box.height) }))
     .filter((c) => c.gap <= MAX_ABOVE_GAP);
 
-  if (kind === 'checkbox' || kind === 'radio') return nearest(right) ?? nearest(left) ?? nearest(above);
-  return nearest(left) ?? nearest(above);
+  // A label above may run over two or three lines; read it from its first line.
+  const aboveBlock = above.map((c) => ({ ...c, run: withLinesAbove(c.run, outside) }));
+  if (kind === 'checkbox' || kind === 'radio') return nearest(right) ?? nearest(left) ?? nearest(aboveBlock);
+  return nearest(left) ?? nearest(aboveBlock);
+}
+
+function withLinesAbove(run: TextRun, runs: ReadonlyArray<TextRun>): TextRun {
+  let text = run.text.trim();
+  let top = run.box;
+  for (let i = 0; i < 2; i++) {
+    // Everything on the line just above that sits over this label.
+    const line = runs
+      .filter(
+        (r) =>
+          r !== run &&
+          top.y - (r.box.y + r.box.height) >= -1 &&
+          top.y - (r.box.y + r.box.height) < 4 &&
+          r.box.x < top.x + top.width + 20 &&
+          r.box.x + r.box.width > top.x - 20,
+      )
+      .sort((a, b) => a.box.x - b.box.x);
+    if (!line.length) break;
+    const joined = line.map((r) => r.text.trim()).join(' ');
+    if (/[.:?]\s*$/.test(joined)) break; // the line above is a sentence of its own
+    text = `${joined} ${text}`;
+    const x1 = Math.min(...line.map((r) => r.box.x));
+    const y1 = Math.min(...line.map((r) => r.box.y));
+    top = { x: x1, y: y1, width: Math.max(...line.map((r) => r.box.x + r.box.width)) - x1, height: top.y - y1 };
+  }
+  return { text, box: run.box };
 }
 
 // Labels refine the kind: "Signature" fields and "Date" fields.

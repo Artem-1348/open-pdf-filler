@@ -1,7 +1,7 @@
 // Form builder round trips (Phase 3): build or edit a form's structure, save,
 // reopen with PDFium, pdf-lib and PDF.js, and check what they see.
 import { readFileSync } from 'node:fs';
-import { PDFDict, PDFDocument, PDFName } from '@cantoo/pdf-lib';
+import { PDFDict, PDFDocument, PDFName, PDFRawStream, decodePDFRawStream } from '@cantoo/pdf-lib';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it } from 'vitest';
 import { findText, openWithPdfium, readFieldsWithPdfium } from '../../tests/support/pdfium-node';
@@ -77,6 +77,22 @@ describe('building a new form', () => {
     expect(extras.get('Second 2')?.maxLen).toBe(5);
     expect(extras.get('Start date')).toMatchObject({ isDate: true, dateFormat: 'MM/DD/YYYY' });
     expect(extras.get('End date')).toMatchObject({ isDate: true, dateFormat: 'DD/MM/YYYY' });
+  });
+
+  it('saves checkboxes made by the app with an X, and reads that style back', async () => {
+    const { bytes } = await build('simple.pdf', () => gateForm(), { 'Agree terms': { kind: 'toggle', on: 0 } });
+    const extras = await readFieldExtras(bytes);
+    expect(extras.get('Agree terms')?.checkStyle).toBe('cross');
+    // The "on" appearance draws two crossing strokes.
+    const doc = await PDFDocument.load(bytes);
+    const widget = doc.getForm().getCheckBox('Agree terms').acroField.getWidgets()[0];
+    const on = widget.getOnValue()!;
+    const stream = (widget.getNormalAppearance() as unknown as PDFDict).lookup(on) as unknown as PDFRawStream;
+    const ops = new TextDecoder('latin1').decode(decodePDFRawStream(stream).decode());
+    expect(ops.match(/ m /g)?.length).toBeGreaterThanOrEqual(2);
+    expect(ops).toMatch(/ S /);
+    // An existing PDF's checkbox keeps its own mark.
+    expect((await readFieldExtras(corpus('fillable-form.pdf'))).get('member_before')?.checkStyle ?? 'check').toBe('check');
   });
 
   it('writes tab order as page order: rows top to bottom, left to right', async () => {

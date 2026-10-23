@@ -16,6 +16,9 @@ import { PageView } from './PageView';
 export interface ViewerHandle {
   scrollToPage(index: number): void;
   scrollToMatch(match: SearchResult): void;
+  // Brings a box (view-space points on a page) into view near the top, where
+  // it stays visible above the phone keyboard and input bar.
+  scrollToBox(page: number, box: { x: number; y: number; width: number; height: number }): void;
 }
 
 interface Props {
@@ -160,6 +163,16 @@ export function Viewer({
         const el = scrollerRef.current;
         const box = boxes[index];
         if (el && box) el.scrollTop = box.top - gap / 2;
+      },
+      scrollToBox(page, target) {
+        const el = scrollerRef.current;
+        const box = boxes[page];
+        if (!el || !box) return;
+        const pageLeft = (el.scrollWidth - box.width) / 2;
+        el.scrollTo({
+          top: Math.max(0, box.top + target.y * scale - el.clientHeight * 0.18),
+          left: Math.max(0, pageLeft + target.x * scale - 12),
+        });
       },
       scrollToMatch(match) {
         const el = scrollerRef.current;

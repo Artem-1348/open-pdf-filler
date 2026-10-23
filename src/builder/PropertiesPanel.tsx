@@ -49,7 +49,9 @@ export function PropertiesPanel({ pageSizes, onGoToPage }: Props) {
   const narrow = useNarrow();
   const selectionKey = state.selection.join(',');
   const [toggled, setToggled] = useState<{ key: string; open: boolean } | null>(null);
-  const defaultOpen = selected.length > 0 || !narrow;
+  // On phones, checking suggestions happens on the page (keep/remove), so
+  // the sheet stays folded for them.
+  const defaultOpen = (selected.length > 0 && !(narrow && onlySuggestions)) || !narrow;
   const open = !state.buildTool && (toggled?.key === selectionKey ? toggled.open : defaultOpen);
   const setOpen = (fn: (v: boolean) => boolean) => setToggled({ key: selectionKey, open: fn(open) });
 

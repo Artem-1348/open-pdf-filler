@@ -7,8 +7,11 @@ import {
   PDFHexString,
   PDFName,
   PDFNumber,
+  PDFRawStream,
   PDFRef,
+  PDFStream,
   PDFString,
+  decodePDFRawStream,
   PDFTextField,
   PDFWidgetAnnotation,
   degrees,
@@ -31,7 +34,13 @@ export interface StructureInput {
   originalFields: ReadonlyArray<FormFieldInfo>;
 }
 
-export function applyStructure(doc: PDFDocument, input: StructureInput, frames: PageFrame[]): void {
+export interface StructureResult {
+  // Checkboxes made by the app, which are drawn with an X (see below).
+  crossCheckboxes: PDFDict[];
+}
+
+export function applyStructure(doc: PDFDocument, input: StructureInput, frames: PageFrame[]): StructureResult {
+  const crossCheckboxes: PDFDict[] = [];
   const form = doc.getForm();
   const pages = doc.getPages();
   const originalByName = new Map(input.originalFields.map((f) => [f.name, f]));
@@ -108,10 +117,11 @@ export function applyStructure(doc: PDFDocument, input: StructureInput, frames: 
     else groups.set(d.name, [d]);
   }
   for (const [name, drafts] of groups) {
-    createField(doc, form, name, drafts, pages, frames, widgetOf, originalByName);
+    createField(doc, form, name, drafts, pages, frames, widgetOf, originalByName, crossCheckboxes);
   }
 
   writeTabOrder(doc, input.drafts, widgetOf);
+  return { crossCheckboxes };
 }
 
 // ---------------------------------------------------------------- update
@@ -173,6 +183,7 @@ function createField(
   frames: PageFrame[],
   widgetOf: Map<string, PDFDict>,
   _original: Map<string, FormFieldInfo>,
+  crossCheckboxes: PDFDict[],
 ) {
   const first = drafts[0];
   const look = (d: FieldDraft) => ({
@@ -208,6 +219,7 @@ function createField(
         uprightOnPage(widget, doc, frames[d.page]);
         renameOnState(widget, d.exportValue || 'Yes');
         widgetOf.set(d.id, widget);
+        crossCheckboxes.push(widget);
       }
       applyProperties(field, first, form, true);
       form.markFieldAsDirty(field.ref);
@@ -276,6 +288,59 @@ function createSignatureField(doc: PDFDocument, form: PDFForm, name: string, d: 
   // Signature fields need the document's AcroForm to say so for some viewers.
   form.acroForm.dict.set(PDFName.of('SigFlags'), PDFNumber.of(1));
   return dict;
+}
+
+// Checkboxes the app creates are marked with an X (the project owner's
+// choice): the "on" appearance is the "off" one plus two strokes, and the
+// caption tells viewers that redraw fields to use ZapfDingbats' cross.
+export function applyCrossAppearances(doc: PDFDocument, widgets: ReadonlyArray<PDFDict>) {
+  for (const widget of widgets) {
+    const w = PDFWidgetAnnotation.fromDict(widget);
+    const rect = w.getRectangle();
+    const ap = widget.lookupMaybe(PDFName.of('AP'), PDFDict);
+    if (!ap) continue;
+    w.getOrCreateAppearanceCharacteristics().setCaptions({ normal: '8' });
+    widget.set(PDFName.of('DA'), PDFString.of('/ZaDb 0 Tf 0 g'));
+    for (const key of ['N', 'D']) {
+      const states = ap.lookupMaybe(PDFName.of(key), PDFDict);
+      if (!states) continue;
+      const off = states.lookupMaybe(PDFName.of('Off'), PDFStream);
+      const base = off ? streamText(off) : '';
+      // Reuse the off state's box and matrix (it may be turned for a rotated page).
+      const bbox = off?.dict.lookupMaybe(PDFName.of('BBox'), PDFArray)?.asArray().map((n) => (n as PDFNumber).asNumber());
+      const matrix = off?.dict.lookupMaybe(PDFName.of('Matrix'), PDFArray)?.asArray().map((n) => (n as PDFNumber).asNumber());
+      for (const name of states.keys()) {
+        if (name.decodeText() === 'Off') continue;
+        const width = bbox ? bbox[2] - bbox[0] : rect.width;
+        const height = bbox ? bbox[3] - bbox[1] : rect.height;
+        const size = Math.min(width, height);
+        const pad = size * 0.22;
+        const x0 = (width - size) / 2 + pad;
+        const y0 = (height - size) / 2 + pad;
+        const x1 = x0 + size - 2 * pad;
+        const y1 = y0 + size - 2 * pad;
+        const lw = Math.max(1, size * 0.1);
+        const cross = `q 0 0 0 RG ${lw.toFixed(2)} w 1 J ${x0} ${y0} m ${x1} ${y1} l S ${x0} ${y1} m ${x1} ${y0} l S Q`;
+        const stream = doc.context.flateStream(`${base}\n${cross}`, {
+          Type: 'XObject',
+          Subtype: 'Form',
+          BBox: bbox ?? [0, 0, width, height],
+          ...(matrix ? { Matrix: matrix } : {}),
+          Resources: {},
+        });
+        states.set(name, doc.context.register(stream));
+      }
+    }
+  }
+}
+
+function streamText(stream: PDFStream): string {
+  try {
+    const bytes = stream instanceof PDFRawStream ? decodePDFRawStream(stream).decode() : stream.getContents();
+    return new TextDecoder('latin1').decode(bytes);
+  } catch {
+    return '';
+  }
 }
 
 // pdf-lib names a checkbox's on-state "Yes"; use the chosen export value.

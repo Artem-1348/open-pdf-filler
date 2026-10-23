@@ -75,6 +75,7 @@ export interface EditorState {
 
 export interface FieldExtrasUpdate {
   maxLen?: number;
+  checkStyle?: import('../pdf/model').CheckStyle;
   fontSize?: number;
   isDate?: boolean;
   dateFormat?: DateFormat;

@@ -718,6 +718,13 @@ select.field-control {
   border-radius: 50%;
 }
 
+/* Checkboxes and radios are tiny at phone zoom: a bigger invisible tap area. */
+.field-control.toggle::before {
+  content: '';
+  position: absolute;
+  inset: -9px;
+}
+
 .field-control.sign {
   display: flex;
   align-items: center;
@@ -1397,6 +1404,88 @@ select.field-control {
   .tool-divider {
     display: none;
   }
+}
+
+/* ---------- Phone input bar ---------- */
+
+.field-control.text-tap {
+  display: block;
+  overflow: hidden;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: text;
+}
+
+.field-control.text-tap.multiline {
+  white-space: pre-wrap;
+}
+
+.field-control.text-tap.active {
+  outline: 2px solid var(--focus);
+  background: var(--field-focus);
+}
+
+.field-input-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.18);
+}
+
+.field-input-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.field-input-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.field-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 17px keeps iPhone Safari from zooming in when the field is focused. */
+.field-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 42px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 17px;
+}
+
+textarea.field-input {
+  resize: none;
+}
+
+.field-input-row .icon-btn {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+/* Room to scroll the last fields up above the bar and keyboard. */
+.workspace.typing-field .pages::after {
+  content: '';
+  flex: none;
+  height: 55vh;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -4,8 +4,10 @@ import fontkit from '@cantoo/fontkit';
 import {
   PDFDict,
   PDFDocument,
+  PDFCheckBox,
   PDFDropdown,
   PDFName,
+  PDFRadioGroup,
   PDFOptionList,
   PDFSignature,
   PDFTextField,
@@ -27,8 +29,8 @@ import {
   type PageFrame,
 } from './geometry';
 import { BASELINE_RATIO, TEXT_LINE_HEIGHT, TEXT_PADDING, autoFieldFontSize } from './layout';
-import { textsIn, type FieldValue, type FormFieldInfo, type PlacedItem } from './model';
-import { DATE_FORMAT_KEY, KIND_KEY, applyStructure, widgetPageIndex, type StructureInput } from './structure';
+import { CHECK_STYLE_CAPTION, textsIn, type CheckStyle, type FieldValue, type FormFieldInfo, type PlacedItem } from './model';
+import { DATE_FORMAT_KEY, KIND_KEY, applyCrossAppearances, applyStructure, widgetPageIndex, type StructureInput } from './structure';
 
 export type FontFile = 'regular' | 'italic';
 
@@ -89,8 +91,10 @@ export async function savePdf(req: SaveRequest): Promise<Uint8Array> {
   const pages = doc.getPages();
   const frames = pages.map(frameOf);
 
-  if (req.structure) applyStructure(doc, req.structure, frames);
+  const created = req.structure ? applyStructure(doc, req.structure, frames) : { crossCheckboxes: [] };
   await fillFields(doc, req, frames, fonts, !!req.structure);
+  // After the appearance pass, which would draw them as ticks again.
+  applyCrossAppearances(doc, created.crossCheckboxes);
   for (const item of req.items) {
     const page = pages[item.page];
     if (page) await drawItem(page, frames[item.page], item, fonts);
@@ -394,6 +398,7 @@ function permissionsFromBits(bits: number | undefined) {
 // Field details PDFium doesn't report (currently the maximum text length).
 export interface FieldExtras {
   maxLen?: number;
+  checkStyle?: CheckStyle;
   // A text field the form builder marked as a date.
   isDate?: boolean;
   dateFormat?: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD';
@@ -422,6 +427,11 @@ export async function readFieldExtras(original: Uint8Array, password?: string): 
     if (field instanceof PDFTextField || field instanceof PDFDropdown || field instanceof PDFOptionList) {
       const size = daFontSize(field);
       if (size !== undefined) extras.fontSize = size;
+    }
+    if (field instanceof PDFCheckBox || field instanceof PDFRadioGroup) {
+      const caption = field.acroField.getWidgets()[0]?.getAppearanceCharacteristics()?.getCaptions().normal;
+      const style = (Object.entries(CHECK_STYLE_CAPTION) as Array<[CheckStyle, string]>).find(([, c]) => c === caption)?.[0];
+      if (style) extras.checkStyle = style;
     }
     if (Object.keys(extras).length) out.set(field.getName(), extras);
   }
