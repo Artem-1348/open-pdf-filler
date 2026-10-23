@@ -2,7 +2,7 @@
 // Includes the gate: a 20-field form fills correctly and Tab walks the
 // fields in page order.
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { expectDocumentOpen, gotoApp, isMobile, openCorpusFile } from './helpers';
+import { expectDocumentOpen, gotoApp, isMobile, openCorpusFile, typeInto, expectFieldText, usesInputBar } from './helpers';
 
 const draft = (page: Page, name: string) => page.locator(`[data-draft="${name}"]`);
 const field = (page: Page, name: string, widget = 0) => page.locator(`[data-field="${name}"]`).nth(widget);
@@ -105,9 +105,9 @@ test.describe('Phase 3 gate', () => {
       expect(order).toEqual(expected.slice(0, 22));
     }
 
-    await field(page, 'F01 First name').fill('Ada');
-    await field(page, 'F05 Zip').fill('12345');
-    await field(page, 'F11 Start').fill('2026-10-21');
+    await typeInto(page, field(page, 'F01 First name'), 'Ada');
+    await typeInto(page, field(page, 'F05 Zip'), '12345');
+    await typeInto(page, field(page, 'F11 Start'), '2026-10-21');
     await field(page, 'F13 Agree').click();
     await field(page, 'F19 Plan', 1).click();
     await field(page, 'F20 Contact', 0).click();
@@ -116,15 +116,15 @@ test.describe('Phase 3 gate', () => {
 
     await reopen(page, path);
     await expect(page.getByTestId('status')).toContainText('20 form fields');
-    await expect(field(page, 'F01 First name')).toHaveValue('Ada');
-    await expect(field(page, 'F05 Zip')).toHaveValue('12345');
-    await expect(field(page, 'F11 Start')).toHaveValue('2026-10-21');
-    await expect(field(page, 'F11 Start')).toHaveAttribute('type', 'date');
+    await expectFieldText(field(page, 'F01 First name'), 'Ada');
+    await expectFieldText(field(page, 'F05 Zip'), '12345');
+    await expectFieldText(field(page, 'F11 Start'), '2026-10-21');
+    if (!(await usesInputBar(page))) await expect(field(page, 'F11 Start')).toHaveAttribute('type', 'date');
     await expect(field(page, 'F13 Agree')).toHaveAttribute('aria-checked', 'true');
     await expect(field(page, 'F14 News')).toHaveAttribute('aria-checked', 'false');
     await expect(field(page, 'F19 Plan', 1)).toHaveAttribute('aria-checked', 'true');
     await expect(field(page, 'F20 Contact', 0)).toHaveAttribute('aria-checked', 'true');
-    await expect(field(page, 'F16 Country')).toHaveValue('Option 2');
+    await expectFieldText(field(page, 'F16 Country'), 'Option 2');
     await expect(field(page, 'F18 Signature')).toHaveText('Sign here');
   });
 });
@@ -147,10 +147,16 @@ test.describe('building', () => {
     const path = await saveCopy(page, testInfo);
 
     await reopen(page, path);
-    await expect(field(page, 'Comments')).toHaveJSProperty('tagName', 'TEXTAREA');
+    if (!(await usesInputBar(page))) await expect(field(page, 'Comments')).toHaveJSProperty('tagName', 'TEXTAREA');
     await expect(field(page, 'Comments')).toHaveAttribute('aria-required', 'true');
     await expect(field(page, 'Comments')).toHaveAttribute('title', 'Anything else?');
-    await expect(field(page, 'PIN')).toHaveAttribute('maxlength', '4');
+    if (await usesInputBar(page)) {
+      await field(page, 'PIN').click();
+      await expect(page.getByTestId('field-input')).toHaveAttribute('maxlength', '4');
+      await page.getByTestId('field-done').click();
+    } else {
+      await expect(field(page, 'PIN')).toHaveAttribute('maxlength', '4');
+    }
     expect(await field(page, 'Dropdown 1').locator('option').allTextContents()).toEqual(['', 'Red', 'Green', 'Blue']);
 
     // And they show in Edit form mode too.

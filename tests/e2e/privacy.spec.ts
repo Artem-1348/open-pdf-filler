@@ -2,7 +2,7 @@
 // a full session (open, password, search, zoom, errors, fill, sign, save)
 // must show only GET requests for the app's own files.
 import { expect, test, type Request } from '@playwright/test';
-import { corpusEntry, expectDocumentOpen, gotoApp, openCorpusFile } from './helpers';
+import { corpusEntry, expectDocumentOpen, gotoApp, openCorpusFile, typeInto } from './helpers';
 
 test('no document bytes leave the device during a full session', async ({ page, context, baseURL }) => {
   const requests: Request[] = [];
@@ -31,7 +31,7 @@ test('no document bytes leave the device during a full session', async ({ page, 
   // Fill, sign and save a copy (Phase 2): saving happens on the device too.
   await openCorpusFile(page, 'all-field-types.pdf');
   await expectDocumentOpen(page, 3);
-  await page.locator('[data-field="name_p0"]').fill('Иван Private');
+  await typeInto(page, page.locator('[data-field="name_p0"]'), 'Иван Private');
   await page.getByTestId('tool-sign').click();
   await page.getByTestId('sig-tab-type').click();
   await page.getByTestId('sig-typed-input').fill('Private Signature');

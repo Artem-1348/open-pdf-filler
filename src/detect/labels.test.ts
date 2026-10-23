@@ -10,6 +10,8 @@ describe('cleanLabel', () => {
     expect(cleanLabel('Married \u0018')).toBe('Married');
     expect(cleanLabel('1. Name of entity/individual:')).toBe('Name of entity/individual');
     expect(cleanLabel('Phone ________')).toBe('Phone');
+    expect(cleanLabel('1 Name of entity')).toBe('Name of entity');
+    expect(cleanLabel('3a Check the box')).toBe('Check the box');
   });
 });
 
@@ -18,6 +20,11 @@ describe('findLabel', () => {
 
   it('uses the text to the left of a text field', () => {
     expect(findLabel(field, 'text', [run('Far away', 10, 102, 40), run('Full name:', 140, 102, 50)])).toBe('Full name');
+  });
+
+  it('reads a label that runs over two lines above the field from its first line', () => {
+    const runs = [run('1', 40, 70, 4), run('Name of entity/individual. An entry is required (for a sole', 50, 70, 300), run('entity’s name on line 2.)', 50, 80, 100)];
+    expect(findLabel(field, 'text', runs)).toMatch(/^Name of entity/);
   });
 
   it('falls back to the text just above', () => {

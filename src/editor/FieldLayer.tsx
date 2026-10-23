@@ -26,7 +26,7 @@ export const FieldLayer = memo(function FieldLayer({ page, scale }: Props) {
 });
 
 function FieldControl({ entry, scale }: { entry: FieldOnPage; scale: number }) {
-  const { state, dispatch, requestSignature } = useEditor();
+  const { state, dispatch, requestSignature, touchInput, activeField, openFieldInput } = useEditor();
   const { field, widgetIndex } = entry;
   const widget = field.widgets[widgetIndex];
   const value = state.values.get(field.name) ?? field.initial;
@@ -55,6 +55,22 @@ function FieldControl({ entry, scale }: { entry: FieldOnPage; scale: number }) {
     case 'text': {
       const text = value.kind === 'text' ? value.text : '';
       const onChange = (t: string) => set({ kind: 'text', text: t });
+      // Phones: a tap opens the input bar above the keyboard (FieldInputBar).
+      if (touchInput && !disabled) {
+        const active = activeField?.name === field.name && activeField.widgetIndex === widgetIndex;
+        return (
+          <button
+            {...common}
+            type="button"
+            tabIndex={0}
+            className={`field-control text-tap${active ? ' active' : ''}${field.multiline ? ' multiline' : ''}`}
+            style={{ ...style, fontSize: fontPx }}
+            onClick={() => openFieldInput({ name: field.name, widgetIndex })}
+          >
+            {text}
+          </button>
+        );
+      }
       // Date fields made by the form builder get the system date picker;
       // text that isn't a date in the field's format stays editable as text.
       if (field.isDate) {
@@ -111,7 +127,7 @@ function FieldControl({ entry, scale }: { entry: FieldOnPage; scale: number }) {
           style={{ ...style, fontSize: Math.min(box.width, box.height) * scale * 0.9 }}
           onClick={toggle}
         >
-          {on ? (field.kind === 'radio' ? '●' : '✓') : ''}
+          {on ? markFor(field) : ''}
         </button>
       );
     }
@@ -185,6 +201,25 @@ function FieldControl({ entry, scale }: { entry: FieldOnPage; scale: number }) {
     }
     case 'button':
       return null;
+  }
+}
+
+// The mark the PDF itself will show, so the screen matches the saved file.
+function markFor(field: FormFieldInfo): string {
+  if (field.kind === 'radio' && !field.checkStyle) return '●';
+  switch (field.checkStyle) {
+    case 'cross':
+      return '✕';
+    case 'circle':
+      return '●';
+    case 'square':
+      return '■';
+    case 'diamond':
+      return '◆';
+    case 'star':
+      return '★';
+    default:
+      return '✓';
   }
 }
 

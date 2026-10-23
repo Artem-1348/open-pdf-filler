@@ -1,7 +1,7 @@
 // Phase 2 (FR-3, FR-4, FR-9): fill fields and flat pages, save a copy, and
 // reopen the saved copy to check every value survived.
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { corpusEntry, expectDocumentOpen, gotoApp, openCorpusFile } from './helpers';
+import { corpusEntry, expectDocumentOpen, gotoApp, openCorpusFile, typeInto, expectFieldText, usesInputBar } from './helpers';
 
 const field = (page: Page, name: string, widget = 0) => page.locator(`[data-field="${name}"]`).nth(widget);
 
@@ -73,34 +73,41 @@ test.describe('existing form fields (FR-3)', () => {
     await expectDocumentOpen(page, 3);
     await expect(page.getByTestId('status')).toContainText('form fields');
 
-    await field(page, 'name_p0').fill('Ada Lovelace');
+    await typeInto(page, field(page, 'name_p0'), 'Ada Lovelace');
     await field(page, 'agree_p0').click();
-    await field(page, 'notes').fill('Line one\nLine two');
+    await typeInto(page, field(page, 'notes'), 'Line one\nLine two');
     await field(page, 'size', 1).click();
     await field(page, 'colour').selectOption('Green');
     await field(page, 'toppings').selectOption(['Olives', 'Onions']);
-    // The length limit is read just after opening.
-    await expect(field(page, 'pin')).toHaveAttribute('maxlength', '4');
-    await field(page, 'pin').fill('123456'); // max length 4
-    await expect(field(page, 'pin')).toHaveValue('1234');
+    // The length limit is read just after opening; max length 4.
+    if (await usesInputBar(page)) {
+      await field(page, 'pin').click();
+      await expect(page.getByTestId('field-input')).toHaveAttribute('maxlength', '4');
+      await page.getByTestId('field-input').fill('123456');
+      await page.getByTestId('field-done').click();
+    } else {
+      await expect(field(page, 'pin')).toHaveAttribute('maxlength', '4');
+      await field(page, 'pin').fill('123456');
+    }
+    await expectFieldText(field(page, 'pin'), '1234');
     // Fields on a page rotated 90°.
-    await field(page, 'name_p90').fill('Sideways');
+    await typeInto(page, field(page, 'name_p90'), 'Sideways');
 
     const { path, name } = await saveCopy(page, testInfo);
     expect(name).toBe('all-field-types (filled).pdf');
     await expect(page.getByTestId('status')).toHaveText(`Saved ${name}.`);
 
     await reopen(page, path, 3);
-    await expect(field(page, 'name_p0')).toHaveValue('Ada Lovelace');
+    await expectFieldText(field(page, 'name_p0'), 'Ada Lovelace');
     await expect(field(page, 'agree_p0')).toHaveAttribute('aria-checked', 'true');
-    await expect(field(page, 'notes')).toHaveValue('Line one\nLine two');
+    await expectFieldText(field(page, 'notes'), 'Line one\nLine two');
     await expect(field(page, 'size', 0)).toHaveAttribute('aria-checked', 'false');
     await expect(field(page, 'size', 1)).toHaveAttribute('aria-checked', 'true');
-    await expect(field(page, 'colour')).toHaveValue('Green');
+    await expectFieldText(field(page, 'colour'), 'Green');
     expect(await field(page, 'toppings').evaluate((el: HTMLSelectElement) => Array.from(el.selectedOptions, (o) => o.value))).toEqual(['Olives', 'Onions']);
-    await expect(field(page, 'pin')).toHaveValue('1234');
+    await expectFieldText(field(page, 'pin'), '1234');
     await field(page, 'name_p90').scrollIntoViewIfNeeded();
-    await expect(field(page, 'name_p90')).toHaveValue('Sideways');
+    await expectFieldText(field(page, 'name_p90'), 'Sideways');
   });
 
   test('fields on sideways pages are drawn where the PDF puts them', async ({ page }) => {
@@ -118,18 +125,18 @@ test.describe('existing form fields (FR-3)', () => {
     const sCorp = 'topmostSubform[0].Page1[0].Boxes3a-b_ReadOrder[0].c1_1[2]';
     await openCorpusFile(page, 'irs-w9-2024-03.pdf');
     await expectDocumentOpen(page, 6);
-    await field(page, name).fill('Jane Example');
+    await typeInto(page, field(page, name), 'Jane Example');
     await field(page, sCorp).click();
     const { path } = await saveCopy(page, testInfo);
     await reopen(page, path, 6);
-    await expect(field(page, name)).toHaveValue('Jane Example');
+    await expectFieldText(field(page, name), 'Jane Example');
     await expect(field(page, sCorp)).toHaveAttribute('aria-checked', 'true');
   });
 
   test('a flattened copy has no fields left, but its values are on the page', async ({ page }, testInfo) => {
     await openCorpusFile(page, 'all-field-types.pdf');
     await expectDocumentOpen(page, 3);
-    await field(page, 'name_p0').fill('Flattened Name');
+    await typeInto(page, field(page, 'name_p0'), 'Flattened Name');
     const { path, name } = await saveCopy(page, testInfo, { flatten: true });
     expect(name).toBe('all-field-types (flattened).pdf');
     await reopen(page, path, 3);
@@ -140,10 +147,10 @@ test.describe('existing form fields (FR-3)', () => {
   test('Cyrillic text is saved with the bundled font', async ({ page }, testInfo) => {
     await openCorpusFile(page, 'all-field-types.pdf');
     await expectDocumentOpen(page, 3);
-    await field(page, 'name_p0').fill('Иван Петров');
+    await typeInto(page, field(page, 'name_p0'), 'Иван Петров');
     const { path } = await saveCopy(page, testInfo);
     await reopen(page, path, 3);
-    await expect(field(page, 'name_p0')).toHaveValue('Иван Петров');
+    await expectFieldText(field(page, 'name_p0'), 'Иван Петров');
   });
 });
 
@@ -302,14 +309,14 @@ test.describe('saving (FR-9)', () => {
   test('unsaved changes are not lost by accident', async ({ page }, testInfo) => {
     await openCorpusFile(page, 'fillable-form.pdf');
     await expectDocumentOpen(page, 1);
-    await field(page, 'full_name').fill('Changed');
+    await typeInto(page, field(page, 'full_name'), 'Changed');
     await expect(page.getByTestId('save-button')).toHaveClass(/primary/);
 
     // Closing asks first; Cancel keeps everything.
     await page.getByTestId('close-button').click();
     await expect(page.getByTestId('confirm-dialog')).toBeVisible();
     await page.getByTestId('confirm-dialog').getByRole('button', { name: 'Cancel' }).click();
-    await expect(field(page, 'full_name')).toHaveValue('Changed');
+    await expectFieldText(field(page, 'full_name'), 'Changed');
 
     // Opening another file asks too.
     await page.getByTestId('open-button').click();
@@ -325,7 +332,7 @@ test.describe('saving (FR-9)', () => {
   test('discarding changes closes the document', async ({ page }) => {
     await openCorpusFile(page, 'fillable-form.pdf');
     await expectDocumentOpen(page, 1);
-    await field(page, 'full_name').fill('Changed');
+    await typeInto(page, field(page, 'full_name'), 'Changed');
     await page.getByTestId('close-button').click();
     await page.getByTestId('confirm-ok').click();
     await expect(page.getByTestId('empty-state')).toBeVisible();
@@ -337,7 +344,7 @@ test.describe('saving (FR-9)', () => {
     const before = readFileSync(corpusPath('fillable-form.pdf'));
     await openCorpusFile(page, 'fillable-form.pdf');
     await expectDocumentOpen(page, 1);
-    await field(page, 'full_name').fill('Changed');
+    await typeInto(page, field(page, 'full_name'), 'Changed');
     const { name } = await saveCopy(page, testInfo);
     expect(name).not.toBe('fillable-form.pdf');
     expect(readFileSync(corpusPath('fillable-form.pdf')).equals(before)).toBe(true);

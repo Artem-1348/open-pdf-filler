@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { expect, type Page, type TestInfo } from '@playwright/test';
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 
 export const CORPUS_DIR = fileURLToPath(new URL('../corpus/', import.meta.url));
 
@@ -64,4 +64,36 @@ export async function expectPageRendered(page: Page, index: number) {
 
 export async function currentPageNumber(page: Page): Promise<number> {
   return Number(await page.getByTestId('page-input').inputValue());
+}
+
+// Phones type text fields through the input bar (FieldInputBar); desktop
+// browsers type into the field on the page. These work for both.
+export async function typeInto(page: Page, field: Locator, value: string) {
+  const tag = await field.evaluate((el) => el.tagName);
+  if (tag !== 'BUTTON') {
+    await field.fill(value);
+    return;
+  }
+  await field.click();
+  await expect(page.getByTestId('field-input-bar')).toBeVisible();
+  await page.getByTestId('field-input').fill(value);
+  await page.getByTestId('field-done').click();
+  await expect(page.getByTestId('field-input-bar')).toHaveCount(0);
+}
+
+// The text a field shows: its value on desktop, its label text on phones.
+// Date fields on phones show the formatted date, so compare the date's parts.
+export async function expectFieldText(field: Locator, value: string) {
+  const tag = await field.evaluate((el) => el.tagName);
+  if (tag === 'BUTTON') {
+    const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    await expect(field).toHaveText(iso ? `${iso[2]}/${iso[3]}/${iso[1]}` : value.replace(/\n/g, '\n'));
+  } else {
+    await expect(field).toHaveValue(value);
+  }
+}
+
+// Whether text fields here are typed through the phone input bar.
+export async function usesInputBar(page: Page): Promise<boolean> {
+  return page.evaluate(() => matchMedia('(pointer: coarse)').matches);
 }

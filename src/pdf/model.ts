@@ -3,6 +3,18 @@
 // geometry.ts).
 import type { Box } from './geometry';
 
+export type CheckStyle = 'check' | 'cross' | 'circle' | 'square' | 'diamond' | 'star';
+
+// ZapfDingbats caption characters used for checkbox marks.
+export const CHECK_STYLE_CAPTION: Record<CheckStyle, string> = {
+  check: '4',
+  cross: '8',
+  circle: 'l',
+  square: 'n',
+  diamond: 'u',
+  star: 'H',
+};
+
 export type FieldKind = 'text' | 'checkbox' | 'radio' | 'combo' | 'list' | 'signature' | 'button';
 
 export interface WidgetInfo {
@@ -19,6 +31,8 @@ export interface FormFieldInfo {
   tooltip?: string;
   // A text field the form builder marked as a date (Phase 3).
   isDate?: boolean;
+  // Checkbox mark as the PDF draws it (from /MK /CA); unknown means a check.
+  checkStyle?: CheckStyle;
   dateFormat?: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD';
   kind: FieldKind;
   widgets: WidgetInfo[];

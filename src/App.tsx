@@ -22,7 +22,8 @@ import { OpenError, openErrorMessage } from './lib/errors';
 import { wrapIndex } from './lib/search';
 import { fitWidthZoom, nextZoomStep, prevZoomStep, type ZoomMode } from './lib/zoom';
 import { listenForLaunchedFiles, takeSharedFile } from './openWith';
-import { EditorContext, groupFieldsByPage, type EditorApi } from './editor/EditorContext';
+import { EditorContext, groupFieldsByPage, type EditorApi, type FieldRef } from './editor/EditorContext';
+import { FieldInputBar } from './editor/FieldInputBar';
 import { FillBar, type DetectProgress } from './editor/FillBar';
 import { toSuggestions } from './detect/suggest';
 import { draftsFromFields } from './builder/model';
@@ -94,6 +95,10 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [detecting, setDetecting] = useState<DetectProgress | null>(null);
+  // Phones and tablets type into an input bar instead of the tiny boxes.
+  const touchInput = useMediaQuery('(pointer: coarse)');
+  // The field being typed into, tied to the document it belongs to.
+  const [typing, setTyping] = useState<{ field: FieldRef; doc: PdfDocumentObject } | null>(null);
   // A short visible message (e.g. detection results); it fades after a while.
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
@@ -118,6 +123,8 @@ export default function App() {
   }, [currentPage]);
 
   const doc = current?.doc ?? null;
+  // The input bar belongs to Fill mode and to the open document.
+  const activeField = typing && typing.doc === doc && editor.mode === 'fill' ? typing.field : null;
   const dirty = current !== null && hasUnsavedChanges(editor);
   const dirtyRef = useRef(false);
   useEffect(() => {
@@ -364,8 +371,35 @@ export default function App() {
 
   const fieldsByPage = useMemo(() => groupFieldsByPage(editor.fields, editor.drafts), [editor.fields, editor.drafts]);
   const editorApi = useMemo<EditorApi>(
-    () => ({ state: editor, dispatch, fieldsByPage, requestSignature }),
-    [editor, fieldsByPage, requestSignature],
+    () => ({
+      state: editor,
+      dispatch,
+      fieldsByPage,
+      requestSignature,
+      touchInput,
+      activeField,
+      openFieldInput: (field: FieldRef | null) => setTyping(field && doc ? { field, doc } : null),
+    }),
+    [editor, fieldsByPage, requestSignature, touchInput, activeField, doc],
+  );
+  const revealField = useCallback((page: number, box: { x: number; y: number; width: number; height: number }) => {
+    viewerRef.current?.scrollToBox(page, box);
+  }, []);
+  // Printed labels next to fields, from the page's text (cached per page).
+  const runsCache = useRef(new Map<string, Promise<Awaited<ReturnType<typeof getTextRuns>>>>());
+  const pageLabel = useCallback(
+    async (page: number, box: { x: number; y: number; width: number; height: number }) => {
+      if (!doc) return undefined;
+      const key = `${doc.id}:${page}`;
+      let runs = runsCache.current.get(key);
+      if (!runs) {
+        runs = getTextRuns(doc, page);
+        runsCache.current.set(key, runs);
+      }
+      const { findLabel } = await import('./detect/labels');
+      return findLabel(box, 'text', await runs);
+    },
+    [doc],
   );
 
   const pickSignatureTool = async () => {
@@ -576,7 +610,16 @@ export default function App() {
         </div>
       )}
 
-      <main className={['workspace', editor.tool ? 'placing' : '', editor.mode === 'edit' ? 'editing-form' : ''].join(' ').trim()}>
+      <main
+        className={[
+          'workspace',
+          editor.tool ? 'placing' : '',
+          editor.mode === 'edit' ? 'editing-form' : '',
+          activeField ? 'typing-field' : '',
+        ]
+          .join(' ')
+          .trim()}
+      >
         {doc ? (
           <EditorContext.Provider value={editorApi}>
             {thumbnailsOpen && (
@@ -596,6 +639,7 @@ export default function App() {
             {editor.mode === 'edit' && (
               <PropertiesPanel pageSizes={doc.pages.map((p) => p.size)} onGoToPage={goToPage} />
             )}
+            {editor.mode === 'fill' && touchInput && <FieldInputBar reveal={revealField} pageLabel={pageLabel} />}
           </EditorContext.Provider>
         ) : (
           <EmptyState onOpen={() => fileInputRef.current?.click()} />
@@ -676,6 +720,17 @@ export default function App() {
       </div>
     </div>
   );
+}
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const list = window.matchMedia(query);
+    const update = () => setMatches(list.matches);
+    list.addEventListener('change', update);
+    return () => list.removeEventListener('change', update);
+  }, [query]);
+  return matches;
 }
 
 function EmptyState({ onOpen }: { onOpen(): void }) {

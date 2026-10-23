@@ -172,12 +172,44 @@ function DraftBox({
       }}
     >
       <span className="draft-label">{draft.kind === 'checkbox' || draft.kind === 'radio' ? '' : label}</span>
-      {suggestion && (
+      {/* Only on the selected one: on a phone, badges on every small box pile up. */}
+      {suggestion && selected && (
         <span className="confidence" aria-hidden="true">
           {Math.round(suggestion.confidence * 100)}
         </span>
       )}
       {selected && state.selection.length === 1 && <ResizeHandle draft={draft} scale={scale} pageSize={pageSize} />}
+      {selected && suggestion && state.selection.length === 1 && <SuggestionTools suggestion={suggestion} />}
+    </div>
+  );
+}
+
+// Keep or remove a suggestion right on the page, then move on to the next
+// one, so a form can be checked box by box.
+function SuggestionTools({ suggestion }: { suggestion: Suggestion }) {
+  const { state, dispatch } = useEditor();
+  const next = () => {
+    const list = visibleSuggestions(state)
+      .filter((d) => d.id !== suggestion.id)
+      .sort((a, b) => a.page - b.page || a.box.y - b.box.y || a.box.x - b.box.x);
+    const after = list.find(
+      (d) => d.page === suggestion.page && (d.box.y > suggestion.box.y + 2 || (Math.abs(d.box.y - suggestion.box.y) <= 2 && d.box.x > suggestion.box.x)),
+    );
+    return after ? [after.id] : [];
+  };
+  const act = (type: 'accept-suggestions' | 'reject-suggestions') => {
+    const following = next();
+    dispatch({ type, ids: [suggestion.id] });
+    dispatch({ type: 'select-drafts', ids: following });
+  };
+  return (
+    <div className="item-tools suggestion-tools" role="toolbar" aria-label="Check this suggestion" onPointerDown={(e) => e.stopPropagation()}>
+      <button type="button" aria-label="Keep this field" title="Keep" onClick={() => act('accept-suggestions')} data-testid="keep-suggestion">
+        ✓
+      </button>
+      <button type="button" className="danger" aria-label="Remove this suggestion" title="Remove" onClick={() => act('reject-suggestions')} data-testid="remove-suggestion">
+        ✕
+      </button>
     </div>
   );
 }
