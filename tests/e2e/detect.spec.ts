@@ -5,13 +5,15 @@ import { expectDocumentOpen, gotoApp, typeInto, expectFieldText } from './helper
 
 const DIR = 'tests/corpus/detect/';
 
-async function detect(page: Page, file: string) {
+async function detect(page: Page, file: string, method: 'quick' | 'ai' = 'quick') {
   await gotoApp(page);
   await page.getByTestId('file-input').setInputFiles(DIR + file);
   await expectDocumentOpen(page, 1);
   await page.getByTestId('mode-edit').click();
   await page.getByTestId('detect-button').click();
-  await expect(page.getByTestId('notice')).toContainText('Found', { timeout: 30_000 });
+  await page.getByTestId(`detect-${method}`).check();
+  await page.getByTestId('detect-start').click();
+  await expect(page.getByTestId('notice')).toContainText(/Found|No new fields/, { timeout: method === 'ai' ? 120_000 : 30_000 });
 }
 
 async function openPanel(page: Page) {
@@ -101,3 +103,52 @@ test('a miss can be added by hand in two taps', async ({ page }) => {
   await layer.click({ position: { x: b.width * 0.8, y: b.height * 0.92 } }); // tap 2
   await expect(page.getByTestId('draft')).toHaveCount(1);
 });
+
+test.describe('AI scan (detector 2)', () => {
+  test.setTimeout(180_000);
+
+  test('finds fields the quick scan cannot see on a custom form, from this site only', async ({ page }) => {
+    const hosts = new Set<string>();
+    page.on('request', (r) => {
+      if (/^https?:/.test(r.url())) hosts.add(new URL(r.url()).host);
+    });
+    await detect(page, 'flat-custom-styles.pdf', 'quick');
+    const quick = await page.getByTestId('suggestion').count();
+
+    await page.getByTestId('detect-button').click();
+    await expect(page.getByTestId('model-download')).toContainText('MB');
+    await page.getByTestId('detect-ai').check();
+    await page.getByTestId('detect-start').click();
+    await expect(page.getByTestId('detect-progress')).toBeVisible();
+    await expect(page.getByTestId('notice')).toContainText('with the AI scan', { timeout: 120_000 });
+    await openPanel(page);
+    const found = Number(await page.getByTestId('suggestion-count').textContent());
+    expect(found).toBeGreaterThanOrEqual(15);
+    expect(found).toBeGreaterThan(quick);
+    // Named from the printed labels, like the quick scan's suggestions.
+    await expect(page.locator('[data-draft="First name"]')).toHaveCount(1);
+    // The model and its runtime come from this site; nothing goes elsewhere.
+    expect([...hosts].filter((h) => h !== new URL(page.url()).host)).toEqual([]);
+
+    // Kept on the device: the next scan needs no download.
+    await page.getByTestId('detect-button').click();
+    await expect(page.getByTestId('model-ready')).toBeVisible();
+    // The AI scan is remembered as the choice.
+    await expect(page.getByTestId('detect-ai')).toBeChecked();
+  });
+
+  test('can be stopped part-way', async ({ page }) => {
+    await gotoApp(page);
+    await page.getByTestId('file-input').setInputFiles('tests/corpus/irs-w9-2024-03.pdf');
+    await expectDocumentOpen(page, 6);
+    await page.getByTestId('mode-edit').click();
+    await page.getByTestId('detect-button').click();
+    await page.getByTestId('detect-ai').check();
+    await page.getByTestId('detect-start').click();
+    await page.getByTestId('detect-stop').click();
+    await expect(page.getByTestId('notice')).toContainText('Stopped');
+    await expect(page.getByTestId('detect-progress')).toHaveCount(0);
+    await expect(page.getByTestId('suggestion')).toHaveCount(0);
+  });
+});
+

@@ -563,5 +563,220 @@
         }
       }
     ]
+  },
+  "flat-custom-styles.pdf": {
+    "note": "custom form in styles the rules do not read",
+    "fields": [
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 140,
+          "y": 80,
+          "width": 200,
+          "height": 20
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 140,
+          "y": 108,
+          "width": 200,
+          "height": 20
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 140,
+          "y": 136,
+          "width": 200,
+          "height": 20
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 150,
+          "y": 169,
+          "width": 190,
+          "height": 18
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 150,
+          "y": 193,
+          "width": 190,
+          "height": 18
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 410,
+          "y": 169,
+          "width": 150,
+          "height": 18
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 410,
+          "y": 193,
+          "width": 150,
+          "height": 18
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 50,
+          "y": 250,
+          "width": 240,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 310,
+          "y": 250,
+          "width": 240,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 50,
+          "y": 304,
+          "width": 200,
+          "height": 20
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 310,
+          "y": 304,
+          "width": 200,
+          "height": 20
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 50,
+          "y": 370,
+          "width": 10,
+          "height": 10
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 160,
+          "y": 370,
+          "width": 10,
+          "height": 10
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 270,
+          "y": 370,
+          "width": 10,
+          "height": 10
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 380,
+          "y": 370,
+          "width": 10,
+          "height": 10
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 190,
+          "y": 399,
+          "width": 15,
+          "height": 11
+        }
+      },
+      {
+        "page": 0,
+        "kind": "checkbox",
+        "box": {
+          "x": 250,
+          "y": 399,
+          "width": 15,
+          "height": 11
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 50,
+          "y": 464,
+          "width": 150,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 230,
+          "y": 464,
+          "width": 150,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 410,
+          "y": 464,
+          "width": 150,
+          "height": 22
+        }
+      },
+      {
+        "page": 0,
+        "kind": "text",
+        "box": {
+          "x": 110,
+          "y": 534,
+          "width": 220,
+          "height": 18
+        }
+      }
+    ]
   }
 }

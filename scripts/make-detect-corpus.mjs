@@ -164,6 +164,109 @@ truth['flat-drawn-form.pdf'] = { note: 'flat form drawn with common patterns', f
   truth['flat-drawn-scan.pdf'] = { note: 'flat-drawn-form.pdf as an image only', fields };
 }
 
+// 4. A custom form in styles the line-and-box rules can't read: shaded
+// blanks without borders, dotted leaders, underscores typed as text,
+// rounded and dashed boxes, round and "( )" choices, white boxes on a
+// grey band. This is what the model (detector 2) is for.
+{
+  const doc = await PDFDocument.create();
+  doc.setCreationDate(new Date('2026-01-01T00:00:00Z'));
+  doc.setModificationDate(new Date('2026-01-01T00:00:00Z'));
+  const f = await doc.embedFont(StandardFonts.Helvetica);
+  const b = await doc.embedFont(StandardFonts.HelveticaBold);
+  const pg = doc.addPage(LETTER);
+  const truthFields = [];
+  const say = (s, x, y, size = 10, fnt = f) => pg.drawText(s, { x, y: H - y - size * 0.8, size, font: fnt, color: ink });
+  const fill = (x, y, w, h, color) => pg.drawRectangle({ x, y: H - y - h, width: w, height: h, color });
+  const add = (kind, x, y, width, height) => truthFields.push({ page: 0, kind, box: { x, y, width, height } });
+  const shade = rgb(0.9, 0.92, 0.95);
+
+  say('Volunteer sign-up (custom layout test form)', 50, 40, 15, b);
+
+  // Shaded blanks, no border.
+  ['First name', 'Last name', 'Organisation'].forEach((label, i) => {
+    const y = 80 + i * 28;
+    say(label, 50, y + 5);
+    fill(140, y, 200, 20, shade);
+    add('text', 140, y, 200, 20);
+  });
+
+  // Dotted leaders typed as text.
+  ['Home address', 'Emergency contact'].forEach((label, i) => {
+    const y = 175 + i * 24;
+    say(label, 50, y);
+    say('.'.repeat(70), 150, y);
+    add('text', 150, y - 6, 190, 18);
+  });
+
+  // Underscores typed as text.
+  ['Mobile', 'Email'].forEach((label, i) => {
+    const y = 175 + i * 24;
+    say(`${label}:`, 360, y);
+    say('_'.repeat(26), 410, y);
+    add('text', 410, y - 6, 150, 18);
+  });
+
+  // Rounded boxes (an SVG path), label above.
+  ['Skills', 'Languages'].forEach((label, i) => {
+    const x = 50 + i * 260;
+    say(label, x, 236, 9, b);
+    const w = 240;
+    const h = 22;
+    const r = 6;
+    pg.drawSvgPath(`M ${r} 0 H ${w - r} Q ${w} 0 ${w} ${r} V ${h - r} Q ${w} ${h} ${w - r} ${h} H ${r} Q 0 ${h} 0 ${h - r} V ${r} Q 0 0 ${r} 0 Z`, {
+      x,
+      y: H - 250,
+      borderColor: ink,
+      borderWidth: 0.8,
+    });
+    add('text', x, 250, w, h);
+  });
+
+  // Dashed boxes.
+  ['Preferred start date', 'Hours per week'].forEach((label, i) => {
+    const x = 50 + i * 260;
+    say(label, x, 290, 9);
+    pg.drawRectangle({ x, y: H - 304 - 20, width: 200, height: 20, borderColor: ink, borderWidth: 0.8, borderDashArray: [3, 2] });
+    add('text', x, 304, 200, 20);
+  });
+
+  // Round choices (drawn circles).
+  say('T-shirt size', 50, 350, 10, b);
+  ['Small', 'Medium', 'Large', 'X-Large'].forEach((label, i) => {
+    const x = 50 + i * 110;
+    pg.drawEllipse({ x: x + 5, y: H - 375, xScale: 5, yScale: 5, borderColor: ink, borderWidth: 0.8 });
+    say(label, x + 15, 371);
+    add('checkbox', x, 370, 10, 10);
+  });
+
+  // "( )" choices typed as text.
+  say('Available on weekends?', 50, 400);
+  [['Yes', 190], ['No', 250]].forEach(([label, x]) => {
+    say('(   )', x, 400);
+    say(label, x + 22, 400);
+    add('checkbox', x, 399, 15, 11);
+  });
+
+  // White boxes on a grey band, no lines at all.
+  fill(40, 430, 532, 70, rgb(0.85, 0.86, 0.88));
+  say('Office use', 50, 436, 9, b);
+  [['Reference', 50], ['Checked by', 230], ['Date received', 410]].forEach(([label, x]) => {
+    say(label, x, 452, 8);
+    fill(x, 464, 150, 22, rgb(1, 1, 1));
+    add('text', x, 464, 150, 22);
+  });
+
+  // A signature area with only a label and a long gap above a footnote.
+  say('Signature', 50, 540);
+  say('_'.repeat(40), 110, 540);
+  add('text', 110, 534, 220, 18);
+
+  const bytes = await doc.save();
+  writeFileSync(new URL('flat-custom-styles.pdf', OUT), bytes);
+  truth['flat-custom-styles.pdf'] = { note: 'custom form in styles the rules do not read', fields: truthFields };
+}
+
 writeFileSync(new URL('detect-truth.json', OUT), JSON.stringify(truth, null, 2) + '\n');
 console.log(`Wrote ${Object.keys(truth).length} detection test files to tests/corpus/detect/`);
 

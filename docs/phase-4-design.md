@@ -15,11 +15,38 @@ Run in order; later detectors skip places an earlier one (or an existing field) 
 | --- | --- | --- | --- | --- |
 | 0 | **Rebuild flattened fields** ([roadmap-changes.md](roadmap-changes.md)) | Exact boxes of fields stripped by "Print → Save as PDF" | 0.98 | Nothing: reads the PDF's leftover shells |
 | 1 | **Rule-based lines and boxes** | Underlines, empty boxes, small squares, empty table cells; works on scans | 0.5–0.9 by shape | Nothing: analyses the rendered page image |
-| 2 | **Model (CommonForms FFDNet-S)** | What the rules miss: unusual layouts, photos of paper forms | model score | Model download (~25 MB) and a license check; **separate decision** |
+| 2 | **AI model (CommonForms FFDetr)**, optional "AI scan" | What the rules miss: shaded or borderless blanks, dotted leaders, typed underscores, rounded or dashed boxes, round and "( )" choices, unusual layouts | model score (0.4–1) | A one-time 46 MB download (model 32 MB + runtime 14 MB), about 4 s a page |
 
-Detector 2 follows the roadmap's spike: export the model to ONNX, time it in the browser on a
-laptop and a phone, confirm the license, write a one-page go/no-go memo. It needs the model
-author's answer on licensing (see Phase 0 report), so it is scheduled after detectors 0 and 1.
+### Detector 2 — AI scan (decided 2026-10-28)
+
+**Model.** FFDNet-S/L (the first plan) still have no licence. The author has since released
+**FFDetr** under Apache-2.0 (an RF-DETR "Medium" model, 33.7 M parameters, three classes: text box,
+choice button, signature), which allows shipping it with attribution. See `public/models/NOTICE`.
+
+**For the browser.** Exported to ONNX at 768 × 768 (it was trained at 1024; 768 is 2.3× faster
+and scored the same on the test set), with weights stored as 8-bit integers plus a per-channel
+scale and expanded to 32-bit floats when loading: 125 MB → 32 MB, same findings as the full
+model on every test page. Rebuild: `scripts/model/README.md` (byte-for-byte reproducible).
+
+**Running it.** ONNX Runtime Web 1.30 (MIT), WebAssembly, in a module worker started for each
+scan and closed after it (frees ~200 MB on phones). One thread: GitHub Pages can't send the
+headers that multi-threading needs. The page is rendered without form fields so its shorter side
+is 768 px, area-averaged into a 768 × 768 square, normalised (ImageNet mean and deviation). Output:
+boxes scoring over 0.4, overlaps (IoU > 0.1) suppressed whatever their class, as CommonForms does;
+small square "text" boxes become checkboxes.
+
+**Merging.** Detectors 0 and 1 win where they overlap the model (their boxes follow the drawing
+exactly); a field found by two detectors gets +0.1 confidence. Labels and names come from the
+page text as for the rules.
+
+**Privacy and offline.** Model and runtime are served from this site (`connect-src 'self'` still
+holds) and kept in Cache Storage, so the first AI scan downloads them and later ones work
+offline. The page images go to a worker on the device, never to a server.
+
+**Interface.** Detect fields opens a choice: **AI scan** (default; says whether the model is
+already on the device, and how long the scan will take) or **Quick scan** (instant, rules only).
+The choice is remembered. During an AI scan the progress pill shows the download, then the page,
+with a **Stop** button.
 
 ### Detector 0 — rebuild flattened fields
 

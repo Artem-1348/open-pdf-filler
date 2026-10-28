@@ -3,7 +3,7 @@
 **Date:** 2026-10-22 · **Gate:** on the flat-form corpus, at least 85% of real fields found and at
 least 85% of suggestions correct; NFR-4 met; any miss fixable in three clicks or fewer.
 
-## Result: gate passed for detectors 0 and 1; detector 2 (model) awaiting a decision
+## Result: gate passed (detectors 0 and 1); detector 2 (AI scan) added and measured
 
 | Test file | Found | Right | Time / page |
 | --- | --- | --- | --- |
@@ -21,6 +21,30 @@ page on a laptop) is met by a wide margin; the iPhone timing is a manual check (
 Matching rule: a suggestion counts if it overlaps a real field with IoU ≥ 0.5 and is the same
 family (checkbox, or text-like). Scoring code: `tests/support/detect-eval.ts`; test:
 `src/detect/detect.test.ts`.
+
+## Detector 2 (AI scan), added 2026-10-28
+
+After the owner's feedback that custom forms weren't detected, the CommonForms FFDetr model
+(Apache-2.0) was added as an optional AI scan. Measured with the same matching rule, page 1 of each
+file (`src/detect/model.test.ts`):
+
+| Test file | Quick scan (rules) | AI scan (rules + model) |
+| --- | --- | --- |
+| Corpus form flattened by PDFium | 5 / 5 | 5 / 5 |
+| Synthetic flat form | 25 / 25 | 25 / 25 |
+| Same form as a picture only | 25 / 25 | 25 / 25 |
+| **New:** custom-style form (shaded blanks, dotted leaders, typed underscores, rounded and dashed boxes, round and "( )" choices, white boxes on a grey band) | **0 / 21** | **19 / 21** |
+| IRS W-9 page 1, fields hidden | 19 / 23 | **23 / 23** |
+| **Overall found** | 75% | **98%** |
+| **Overall right** | 100% | **100%** |
+
+Owner's real form (8 pages, checked locally, not committed), scored as if it had been printed and
+scanned (detector 0 off), a match being a suggestion whose centre lies in a real field of the same
+family: quick scan 76 / 328 found, AI scan **244 / 328** found with 75% right. With the file as it
+is, detector 0 still rebuilds all 328.
+
+Speed (one thread, WebAssembly): about 3.8 s a page on a MacBook Air M3 in Node and 4.1 s for one
+page in Chromium including loading the cached model. The iPhone timing is a manual check.
 
 ## What was built
 
@@ -41,8 +65,8 @@ family (checkbox, or text-like). Scoring code: `tests/support/detect-eval.ts`; t
 
 ## Not done yet
 
-- **Detector 2 (CommonForms model).** Needs a licence answer from the model's author (none is
-  stated) and a ~25 MB download per user. Scheduled as the roadmap's spike after the decision.
+- **Detector 2 on iPhone:** speed and memory on the owner's iPhone 17 Pro Max (manual).
+- **Faster AI scan:** WebGPU, or multi-threading through a cross-origin-isolating service worker.
 - **YES/NO pairs as radio groups:** two checkboxes per question are suggested as separate
   checkboxes.
 - **iPhone timing** for NFR-4 (manual).

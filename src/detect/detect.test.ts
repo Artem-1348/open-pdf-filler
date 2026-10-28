@@ -16,7 +16,11 @@ const DIR = 'tests/corpus/detect/';
 const truthFile = JSON.parse(readFileSync(`${DIR}detect-truth.json`, 'utf8')) as Record<string, { fields: Truth[] }>;
 
 async function cases(): Promise<Case[]> {
-  const list: Case[] = Object.entries(truthFile).map(([file, t]) => ({ file: DIR + file, truth: t.fields }));
+  // The custom-styles form is the AI scan's test (model.test.ts); the
+  // quick scan isn't meant to read it.
+  const list: Case[] = Object.entries(truthFile)
+    .filter(([file]) => file !== 'flat-custom-styles.pdf')
+    .map(([file, t]) => ({ file: DIR + file, truth: t.fields }));
   // The IRS W-9 as a flat form: its fields are hidden when rendered, and
   // the detectors must find them from the drawing alone.
   const w9 = 'tests/corpus/irs-w9-2024-03.pdf';

@@ -97,6 +97,8 @@ test.describe('confirming suggestions on the page', () => {
     await expectDocumentOpen(page, 1);
     await page.getByTestId('mode-edit').click();
     await page.getByTestId('detect-button').click();
+    await page.getByTestId('detect-quick').check();
+    await page.getByTestId('detect-start').click();
     await expect(page.getByTestId('notice')).toContainText('Found');
 
     const total = await page.getByTestId('suggestion').count();
