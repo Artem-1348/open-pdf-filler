@@ -23,6 +23,9 @@ import { canRedo, canUndo, type Tool } from './state';
 export interface DetectProgress {
   done: number;
   total: number;
+  // AI scan only: megabytes downloaded so far while the model loads.
+  downloadMB?: number;
+  ai?: boolean;
 }
 
 interface Props {
@@ -32,9 +35,10 @@ interface Props {
   // Auto-detect (Phase 4): null when not running.
   detecting: DetectProgress | null;
   onDetect(): void;
+  onStopDetect(): void;
 }
 
-export function FillBar({ dirty, onSignature, onSave, detecting, onDetect }: Props) {
+export function FillBar({ dirty, onSignature, onSave, detecting, onDetect, onStopDetect }: Props) {
   const { state, dispatch } = useEditor();
   const active = state.tool?.kind ?? null;
   const pick = (tool: Tool) => dispatch({ type: 'set-tool', tool: active === tool.kind ? null : tool });
@@ -124,7 +128,14 @@ export function FillBar({ dirty, onSignature, onSave, detecting, onDetect }: Pro
       <div className="toolbar-group">
         {detecting && (
           <span className="tool-hint floating" role="status" data-testid="detect-progress">
-            Looking for fields… page {Math.min(detecting.done + 1, detecting.total)} of {detecting.total}
+            {detecting.downloadMB !== undefined
+              ? `Getting the AI model… ${detecting.downloadMB} MB`
+              : `${detecting.ai ? 'AI scan' : 'Looking for fields'}… page ${Math.min(detecting.done + 1, detecting.total)} of ${detecting.total}`}
+            {detecting.ai && (
+              <button type="button" className="hint-action" onClick={onStopDetect} data-testid="detect-stop">
+                Stop
+              </button>
+            )}
           </span>
         )}
         {!detecting && (state.tool || build) && (

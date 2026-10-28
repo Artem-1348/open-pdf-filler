@@ -31,6 +31,10 @@ End-to-end tests run against the production build, including its Content Securit
 - Fallback fonts are turned off so PDFium never fetches anything from a CDN.
 - The production build ships a Content Security Policy with `connect-src 'self'`, so the page
   cannot send data to another server.
+- Detect fields has a quick scan (rules that read drawn lines and boxes) and an optional AI scan:
+  the FFDetr model from [CommonForms](https://github.com/jbarrow/commonforms), run in the browser
+  with [ONNX Runtime Web](https://onnxruntime.ai/). The model (32 MB) and runtime (14 MB) are
+  served from this site, downloaded on first use and kept on the device. Pages never leave it.
 
 ## "Open with" support
 
@@ -49,3 +53,8 @@ happen with each one. `npm run corpus` regenerates the synthetic files. See
 ## License
 
 [MIT](LICENSE). Free to use, change and share.
+
+The AI scan's model, `public/models/ffdetr-768-q8.onnx`, is FFDetr by Joe Barrow (CommonForms),
+licensed under Apache-2.0 and changed for the browser; see
+[public/models/NOTICE](public/models/NOTICE) and [scripts/model](scripts/model/README.md).
+ONNX Runtime Web is MIT-licensed.

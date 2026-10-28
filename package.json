@@ -27,6 +27,7 @@
     "@embedpdf/engines": "^2.15.1",
     "@embedpdf/models": "^2.15.1",
     "@embedpdf/pdfium": "^2.15.1",
+    "onnxruntime-web": "1.30.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

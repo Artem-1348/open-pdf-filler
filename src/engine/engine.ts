@@ -133,6 +133,15 @@ export async function getTextRuns(doc: PdfDocumentObject, pageIndex: number) {
 
 // The page in grey at `scale` pixels per point, without form fields, for the
 // rule-based detector.
+// A colour rendering for the AI model (detector 2), without form fields.
+export async function getPageRgba(doc: PdfDocumentObject, pageIndex: number, scale: number) {
+  const engine = await getEngine();
+  const img = await engine
+    .renderPageRaw(doc, doc.pages[pageIndex], { scaleFactor: scale, dpr: 1, withAnnotations: false, withForms: false })
+    .toPromise();
+  return { width: img.width, height: img.height, data: img.data };
+}
+
 export async function getPageImage(doc: PdfDocumentObject, pageIndex: number, scale = 2) {
   const engine = await getEngine();
   const img = await engine

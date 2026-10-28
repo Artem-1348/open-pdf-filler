@@ -9,6 +9,7 @@ import { FileIcon } from './components/icons';
 import {
   closePdf,
   getPageImage,
+  getPageRgba,
   getTextRuns,
   openPdf,
   readForm,
@@ -26,6 +27,9 @@ import { EditorContext, groupFieldsByPage, type EditorApi, type FieldRef } from 
 import { FieldInputBar } from './editor/FieldInputBar';
 import { FillBar, type DetectProgress } from './editor/FillBar';
 import { toSuggestions } from './detect/suggest';
+import { modelOnDevice } from './detect/model-cache';
+import { modelRenderScale } from './detect/model';
+import { DetectDialog, type DetectMethod } from './editor/DetectDialog';
 import { draftsFromFields } from './builder/model';
 import { SaveDialog, type SaveChoice } from './editor/SaveDialog';
 import { SignatureDialog } from './editor/SignatureDialog';
@@ -95,6 +99,9 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [detecting, setDetecting] = useState<DetectProgress | null>(null);
+  // "Find fields" dialog: open with whether the AI model is on the device.
+  const [detectChoice, setDetectChoice] = useState<{ modelOnDevice: boolean } | null>(null);
+  const detectAbort = useRef<AbortController | null>(null);
   // Phones and tablets type into an input bar instead of the tiny boxes.
   const touchInput = useMediaQuery('(pointer: coarse)');
   // The field being typed into, tied to the document it belongs to.
@@ -440,13 +447,30 @@ export default function App() {
   };
 
   // Phase 4: run the detectors and show what they found as suggestions.
-  const runDetection = async () => {
+  // The AI scan (detector 2) is optional; the choice is remembered.
+  const openDetect = async () => {
     if (!current || detecting) return;
+    setDetectChoice({ modelOnDevice: await modelOnDevice(document.baseURI) });
+  };
+
+  const runDetection = async (method: DetectMethod) => {
+    if (!current || detecting) return;
+    rememberDetectMethod(method);
     const { doc: d, file, password } = current;
-    setDetecting({ done: 0, total: d.pageCount });
+    const ai = method === 'ai';
+    const abort = new AbortController();
+    detectAbort.current = abort;
+    setDetecting(ai ? { done: 0, total: d.pageCount, ai, downloadMB: 0 } : { done: 0, total: d.pageCount });
     const started = performance.now();
+    let model: import('./detect/model-client').ModelRunner | null = null;
     try {
       const { detectFields } = await import('./detect/run');
+      if (ai) {
+        const { startModel } = await import('./detect/model-client');
+        model = await startModel((bytes) => setDetecting((p) => p && { ...p, downloadMB: Math.round(bytes / 1e6) }), abort.signal);
+        setDetecting({ done: 0, total: d.pageCount, ai });
+      }
+      const runner = model;
       const existing = editor.drafts ?? draftsFromFields(editor.originalFields);
       const found = await detectFields({
         bytes: new Uint8Array(await file.arrayBuffer()),
@@ -455,21 +479,36 @@ export default function App() {
         existing,
         textRuns: (page) => getTextRuns(d, page),
         pageImage: (page) => getPageImage(d, page),
-        onProgress: (done, total) => setDetecting({ done, total }),
+        modelFindings: runner
+          ? async (page) => {
+              const scale = modelRenderScale(d.pages[page].size);
+              return runner.findings(page, await getPageRgba(d, page, scale), scale);
+            }
+          : undefined,
+        onProgress: (done, total) => setDetecting({ done, total, ai }),
+        signal: abort.signal,
       });
       if (currentRef.current?.doc !== d) return;
       dispatch({ type: 'set-suggestions', suggestions: toSuggestions(found, existing) });
       const seconds = ((performance.now() - started) / 1000).toFixed(1);
+      const how = ai ? ' with the AI scan' : '';
       const message = found.length
-        ? `Found ${found.length} possible field${found.length === 1 ? '' : 's'} in ${seconds} s. Review them in the panel.`
-        : `No new fields found (${seconds} s). You can add fields with the tools.`;
+        ? `Found ${found.length} possible field${found.length === 1 ? '' : 's'}${how} in ${seconds} s. Review them in the panel.`
+        : `No new fields found${how} (${seconds} s). You can add fields with the tools.`;
       setStatus(message);
       setNotice(message);
-    } catch {
-      const message = 'Field detection stopped because of an error. Your form is unchanged.';
+    } catch (err) {
+      const message = abort.signal.aborted
+        ? 'Stopped looking for fields. Nothing was changed.'
+        : ai && model === null
+          ? "The AI model couldn't be loaded. Check your connection and try again, or use the quick scan."
+          : 'Field detection stopped because of an error. Your form is unchanged.';
+      if (!abort.signal.aborted) console.error(err);
       setStatus(message);
       setNotice(message);
     } finally {
+      model?.close();
+      detectAbort.current = null;
       setDetecting(null);
     }
   };
@@ -582,7 +621,8 @@ export default function App() {
             onSignature={() => void pickSignatureTool()}
             onSave={() => setSaveOpen(true)}
             detecting={detecting}
-            onDetect={() => void runDetection()}
+            onDetect={() => void openDetect()}
+            onStopDetect={() => detectAbort.current?.abort()}
           />
         </EditorContext.Provider>
       )}
@@ -684,6 +724,19 @@ export default function App() {
 
       {signatureRequest && <SignatureDialog previous={lastSignature} onDone={signatureRequest} />}
 
+      {detectChoice && current && (
+        <DetectDialog
+          initial={lastDetectMethod()}
+          modelOnDevice={detectChoice.modelOnDevice}
+          pageCount={current.doc.pageCount}
+          onCancel={() => setDetectChoice(null)}
+          onStart={(method) => {
+            setDetectChoice(null);
+            void runDetection(method);
+          }}
+        />
+      )}
+
       {saveOpen && current && (
         <SaveDialog
           fileNameFor={(flatten) => savedFileName(current.fileName, flatten)}
@@ -747,4 +800,21 @@ function EmptyState({ onOpen }: { onOpen(): void }) {
       </div>
     </section>
   );
+}
+
+// The scan chosen last time (a per-device convenience).
+const DETECT_METHOD_KEY = 'opf.detectMethod';
+function lastDetectMethod(): DetectMethod {
+  try {
+    return localStorage.getItem(DETECT_METHOD_KEY) === 'quick' ? 'quick' : 'ai';
+  } catch {
+    return 'ai';
+  }
+}
+function rememberDetectMethod(method: DetectMethod) {
+  try {
+    localStorage.setItem(DETECT_METHOD_KEY, method);
+  } catch {
+    // Storage blocked: the dialog just starts on the AI scan next time.
+  }
 }

@@ -1,0 +1,19 @@
+ffdetr-768-q8.onnx
+==================
+
+The AI scan's form-field detection model.
+
+Source: FFDetr by Joe Barrow, part of the CommonForms project
+  https://huggingface.co/jbarrow/FFDetr  (FFDetr.pth, sha256
+  f852e1bac18c8f435b82270fc8ff8e2ca4a2cd8869c411fa8f473f16e69585ef)
+  https://github.com/jbarrow/commonforms
+Licensed under the Apache License, Version 2.0 (see LICENSE in this folder).
+
+FFDetr is an RF-DETR model (Roboflow, Apache-2.0) trained on the
+CommonForms dataset (Apache-2.0).
+
+Changes made by Open PDF Filler:
+  - exported to ONNX (opset 17) at a 768 × 768 input size;
+  - weights stored as 8-bit integers with a per-channel scale, expanded
+    back to 32-bit floats when the model loads.
+How to rebuild it: scripts/model/README.md.
