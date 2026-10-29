@@ -3,6 +3,7 @@
 // full-size input and Prev / Next / Done (like the keyboard's own form bar).
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatToIso, isoToFormat } from '../builder/dates';
+import { useKeyboardInset } from './useKeyboardInset';
 import type { FormFieldInfo } from '../pdf/model';
 import { useEditor, type FieldRef } from './EditorContext';
 
@@ -136,22 +137,4 @@ export function FieldInputBar({ reveal, pageLabel }: Props) {
       </div>
     </div>
   );
-}
-
-// How far the on-screen keyboard pushes up from the bottom of the window.
-function useKeyboardInset(): number {
-  const [inset, setInset] = useState(0);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => setInset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
-    update();
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
-    };
-  }, []);
-  return inset;
 }

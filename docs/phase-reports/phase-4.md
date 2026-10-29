@@ -56,6 +56,16 @@ page in Chromium including loading the cached model. The iPhone timing is a manu
 | Review (FR-6) | Dashed suggestions with a confidence badge; tap to inspect, change type or name, move or resize; accept or reject one, several, or all; confidence filter; undo |
 | Fixing a miss | Two taps with the Phase 3 palette |
 
+## Changes from the owner's testing (2026-10-29)
+
+| Feedback | Change |
+| --- | --- |
+| Adding many text boxes means picking the tool again each time | A picked tool (Fill and Edit form) stays on until **Done**. In Fill mode, Done then starts typing in the first empty text box. Choice buttons tapped in a row make one question |
+| The delete button on a small checkbox covers the next one | Delete, A−/A+ and Keep/Remove moved from the page to a bar at the bottom of the screen (above the keyboard while typing) |
+| Deleting many close checkboxes one by one is slow | New **Select** tool in both modes: draw a loop around items or fields, then Delete (one undo step) |
+| "Radio" is unclear | Renamed **Choice**, with a hint: "Tap each choice. Only one can be picked" |
+| Changing a placed date means typing | A **Calendar** button in the bar opens the system date picker; typing still works |
+
 ## Bugs found and fixed in this phase
 
 | Bug | Severity | Found by |

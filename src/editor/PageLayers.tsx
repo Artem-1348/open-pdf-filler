@@ -4,6 +4,7 @@ import { DraftLayer } from '../builder/DraftLayer';
 import { useEditor } from './EditorContext';
 import { FieldLayer } from './FieldLayer';
 import { ItemLayer } from './ItemLayer';
+import { LassoSurface } from './LassoSurface';
 import { PlacementSurface } from './PlacementSurface';
 
 interface Props {
@@ -23,6 +24,7 @@ export function PageLayers({ page, scale, pageWidth, pageHeight }: Props) {
           <ItemLayer page={page} scale={scale} pageWidth={pageWidth} pageHeight={pageHeight} />
         </div>
         <DraftLayer page={page} scale={scale} pageWidth={pageWidth} pageHeight={pageHeight} />
+        {state.lasso && <LassoSurface page={page} scale={scale} />}
       </>
     );
   }
@@ -31,6 +33,7 @@ export function PageLayers({ page, scale, pageWidth, pageHeight }: Props) {
       <FieldLayer page={page} scale={scale} />
       <ItemLayer page={page} scale={scale} pageWidth={pageWidth} pageHeight={pageHeight} />
       <PlacementSurface page={page} scale={scale} />
+      {state.lasso && <LassoSurface page={page} scale={scale} />}
     </>
   );
 }

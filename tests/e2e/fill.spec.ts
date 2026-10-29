@@ -1,7 +1,7 @@
 // Phase 2 (FR-3, FR-4, FR-9): fill fields and flat pages, save a copy, and
 // reopen the saved copy to check every value survived.
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { corpusEntry, expectDocumentOpen, gotoApp, openCorpusFile, typeInto, expectFieldText, usesInputBar } from './helpers';
+import { corpusEntry, drawLoop, expectDocumentOpen, gotoApp, openCorpusFile, typeInto, expectFieldText, usesInputBar } from './helpers';
 
 const field = (page: Page, name: string, widget = 0) => page.locator(`[data-field="${name}"]`).nth(widget);
 
@@ -12,6 +12,10 @@ async function placeAt(page: Page, pageIndex: number, fx: number, fy: number) {
   const box = (await target.boundingBox())!;
   await target.click({ position: { x: box.width * fx, y: box.height * fy } });
 }
+
+// A tool stays on after placing; Done puts it down (and, for text, starts
+// typing in the first empty box).
+const done = (page: Page) => page.getByTestId('tool-done').click();
 
 // Saves through the dialog and returns the path of the downloaded copy.
 async function saveCopy(page: Page, testInfo: TestInfo, { flatten = false } = {}) {
@@ -161,6 +165,7 @@ test.describe('adding to any page (FR-4)', () => {
 
     await page.getByTestId('tool-text').click();
     await placeAt(page, 0, 0.15, 0.3);
+    await done(page);
     await page.keyboard.type('Placed by a test');
     await page.getByTestId('tool-date').click();
     await placeAt(page, 0, 0.6, 0.3);
@@ -214,12 +219,14 @@ test.describe('adding to any page (FR-4)', () => {
     await expectDocumentOpen(page, 1);
     await page.getByTestId('tool-check').click();
     await placeAt(page, 0, 0.3, 0.2);
+    await done(page);
     const item = page.getByTestId('placed-item');
     const start = (await item.boundingBox())!;
     const touch = testInfo.project.name === 'mobile-chrome' && browserName === 'chromium';
 
     const center = { x: start.x + start.width / 2, y: start.y + start.height / 2 };
     await drag(page, center, { x: center.x + 60, y: center.y + 40 }, touch);
+    await expect(page.getByTestId('item-resize')).toBeVisible();
     const moved = (await item.boundingBox())!;
     expect(moved.x - start.x).toBeGreaterThan(50);
     expect(moved.y - start.y).toBeGreaterThan(30);
@@ -235,19 +242,88 @@ test.describe('adding to any page (FR-4)', () => {
     await expectDocumentOpen(page, 1);
     await page.getByTestId('tool-check').click();
     await placeAt(page, 0, 0.3, 0.2);
+    await done(page);
+    await page.getByTestId('placed-item').click();
     await page.getByTestId('item-delete').click();
     await expect(page.getByTestId('placed-item')).toHaveCount(0);
 
     await page.getByTestId('tool-text').click();
     await placeAt(page, 0, 0.2, 0.3);
+    await done(page);
     await page.keyboard.type('Grow');
     const text = page.getByTestId('item-text');
     const before = await text.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
     await page.getByTestId('item-larger').click();
     await expect.poll(() => text.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThan(before);
-    // Focus is on the A+ button now, so Delete removes the selected item.
-    await page.keyboard.press('Delete');
+    // A+ keeps the keyboard in the text: typing goes on.
+    await page.keyboard.type('n');
+    await expect(text).toHaveText('Grown');
+    await page.getByTestId('item-delete').click();
     await expect(page.getByTestId('placed-item')).toHaveCount(0);
+  });
+
+  test('a tool stays on: place several, then type in each', async ({ page }) => {
+    await openCorpusFile(page, 'simple.pdf');
+    await expectDocumentOpen(page, 1);
+    await page.getByTestId('tool-text').click();
+    for (const y of [0.3, 0.4, 0.5]) await placeAt(page, 0, 0.2, y);
+    await expect(page.getByTestId('placed-item')).toHaveCount(3);
+    await expect(page.getByTestId('tool-text')).toHaveAttribute('aria-pressed', 'true');
+    // Done starts typing in the first box.
+    await done(page);
+    await expect(page.getByTestId('tool-text')).toHaveAttribute('aria-pressed', 'false');
+    await page.keyboard.type('One');
+    const texts = page.getByTestId('item-text');
+    await expect(texts.nth(0)).toHaveText('One');
+    await texts.nth(1).click();
+    await page.keyboard.type('Two');
+    await expect(texts.nth(1)).toHaveText('Two');
+
+    await page.getByTestId('tool-check').click();
+    for (const x of [0.5, 0.55, 0.6]) await placeAt(page, 0, x, 0.3);
+    await expect(page.locator('[data-kind="check"]')).toHaveCount(3);
+  });
+
+  test('Select: a loop around close checkmarks deletes them together', async ({ page }) => {
+    await openCorpusFile(page, 'simple.pdf');
+    await expectDocumentOpen(page, 1);
+    await page.getByTestId('tool-check').click();
+    for (const x of [0.5, 0.54, 0.58]) await placeAt(page, 0, x, 0.3);
+    await placeAt(page, 0, 0.5, 0.5);
+    await done(page);
+
+    await page.getByTestId('tool-lasso').click();
+    const marks = page.locator('[data-kind="check"]');
+    const first = (await marks.nth(0).boundingBox())!;
+    const third = (await marks.nth(2).boundingBox())!;
+    await drawLoop(page, {
+      x: (first.x + third.x + third.width) / 2,
+      y: first.y + first.height / 2,
+      rx: (third.x + third.width - first.x) / 2 + 12,
+      ry: first.height,
+    });
+    await expect(page.getByTestId('selection-bar')).toContainText('3 items');
+    await page.getByTestId('selection-delete').click();
+    await expect(marks).toHaveCount(1);
+    // One undo brings all three back.
+    await page.getByTestId('undo').click();
+    await expect(marks).toHaveCount(4);
+    await page.getByTestId('lasso-done').click();
+    await expect(page.getByTestId('lasso-surface')).toHaveCount(0);
+  });
+
+  test('a placed date can be changed from a calendar as well as typed', async ({ page }) => {
+    await openCorpusFile(page, 'simple.pdf');
+    await expectDocumentOpen(page, 1);
+    await page.getByTestId('tool-date').click();
+    await placeAt(page, 0, 0.3, 0.3);
+    await done(page);
+    const date = page.locator('[data-kind="date"] [data-testid="item-text"]');
+    await expect(date).toHaveText(/\d/);
+    await page.getByTestId('placed-item').click();
+    await expect(page.getByTestId('item-date-input')).toBeAttached();
+    await page.getByTestId('item-date-input').fill('2026-12-25');
+    await expect(date).toHaveText(await page.evaluate(() => new Date(2026, 11, 25).toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' })));
   });
 
   test('Escape puts a tool down without placing anything', async ({ page }) => {
@@ -265,6 +341,7 @@ test.describe('adding to any page (FR-4)', () => {
     await expectDocumentOpen(page, 1);
     await page.getByTestId('tool-text').click();
     await placeAt(page, 0, 0.2, 0.4);
+    await done(page);
     await page.keyboard.type('Hello 你好');
     await page.getByTestId('save-button').click();
     await page.getByTestId('save-confirm').click();
@@ -292,6 +369,7 @@ test.describe('saving (FR-9)', () => {
     await expectDocumentOpen(page, 1);
     await page.getByTestId('tool-text').click();
     await placeAt(page, 0, 0.2, 0.4);
+    await done(page);
     await page.keyboard.type('Still secret');
     await page.getByTestId('save-button').click();
     await expect(page.getByTestId('save-dialog')).toContainText('keeps the same password');

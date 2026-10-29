@@ -7,6 +7,7 @@ import {
   CrossIcon,
   DateIcon,
   DropdownIcon,
+  LassoIcon,
   RadioIcon,
   RedoIcon,
   SaveIcon,
@@ -17,6 +18,7 @@ import {
   WandIcon,
 } from '../components/icons';
 import type { CreatableKind } from '../builder/model';
+import { ActionBar } from './ActionBar';
 import { useEditor } from './EditorContext';
 import { canRedo, canUndo, type Tool } from './state';
 
@@ -81,7 +83,14 @@ export function FillBar({ dirty, onSignature, onSave, detecting, onDetect, onSto
           <ToolButton label="Checkbox" active={build === 'checkbox'} disabled={false} onClick={() => pickField('checkbox')} testId="field-tool-checkbox">
             <CheckboxIcon />
           </ToolButton>
-          <ToolButton label="Radio" active={build === 'radio'} disabled={false} onClick={() => pickField('radio')} testId="field-tool-radio">
+          <ToolButton
+            label="Choice"
+            title="Choice: round buttons where only one can be picked (radio buttons)"
+            active={build === 'radio'}
+            disabled={false}
+            onClick={() => pickField('radio')}
+            testId="field-tool-radio"
+          >
             <RadioIcon />
           </ToolButton>
           <ToolButton label="Dropdown" active={build === 'dropdown'} disabled={false} onClick={() => pickField('dropdown')} testId="field-tool-dropdown">
@@ -91,6 +100,16 @@ export function FillBar({ dirty, onSignature, onSave, detecting, onDetect, onSto
             <SignIcon />
           </ToolButton>
           <span className="tool-divider" aria-hidden="true" />
+          <ToolButton
+            label="Select"
+            title="Select: draw a loop around fields to select them"
+            active={state.lasso}
+            disabled={false}
+            onClick={() => dispatch({ type: 'set-lasso', on: !state.lasso })}
+            testId="field-tool-lasso"
+          >
+            <LassoIcon />
+          </ToolButton>
           <ToolButton label={detecting ? 'Detecting…' : 'Detect fields'} active={!!detecting} disabled={!!detecting} onClick={onDetect} testId="detect-button">
             <WandIcon />
           </ToolButton>
@@ -118,6 +137,17 @@ export function FillBar({ dirty, onSignature, onSave, detecting, onDetect, onSto
         >
           <SignIcon />
         </ToolButton>
+        <span className="tool-divider" aria-hidden="true" />
+        <ToolButton
+          label="Select"
+          title="Select: draw a loop around items to select them"
+          active={state.lasso}
+          disabled={!state.canEdit || !state.items.length}
+          onClick={() => dispatch({ type: 'set-lasso', on: !state.lasso })}
+          testId="tool-lasso"
+        >
+          <LassoIcon />
+        </ToolButton>
       </div>
       )}
       {!state.canEdit && (
@@ -126,23 +156,7 @@ export function FillBar({ dirty, onSignature, onSave, detecting, onDetect, onSto
         </p>
       )}
       <div className="toolbar-group">
-        {detecting && (
-          <span className="tool-hint floating" role="status" data-testid="detect-progress">
-            {detecting.downloadMB !== undefined
-              ? `Getting the AI model… ${detecting.downloadMB} MB`
-              : `${detecting.ai ? 'AI scan' : 'Looking for fields'}… page ${Math.min(detecting.done + 1, detecting.total)} of ${detecting.total}`}
-            {detecting.ai && (
-              <button type="button" className="hint-action" onClick={onStopDetect} data-testid="detect-stop">
-                Stop
-              </button>
-            )}
-          </span>
-        )}
-        {!detecting && (state.tool || build) && (
-          <span className="tool-hint floating" role="status" data-testid="tool-hint">
-            {build ? 'Tap the page to add the field' : state.tool?.kind === 'text' ? 'Tap where the text should start' : 'Tap the page to place it'}
-          </span>
-        )}
+        <ActionBar detecting={detecting} onStopDetect={onStopDetect} />
         <button
           type="button"
           className="icon-btn"
@@ -176,6 +190,7 @@ export function FillBar({ dirty, onSignature, onSave, detecting, onDetect, onSto
 
 function ToolButton({
   label,
+  title,
   active,
   disabled,
   onClick,
@@ -183,6 +198,7 @@ function ToolButton({
   children,
 }: {
   label: string;
+  title?: string;
   active: boolean;
   disabled: boolean;
   onClick(): void;
@@ -197,7 +213,7 @@ function ToolButton({
       disabled={disabled}
       onClick={onClick}
       data-testid={testId}
-      title={label}
+      title={title ?? label}
     >
       {children}
       <span className="tool-label">{label}</span>

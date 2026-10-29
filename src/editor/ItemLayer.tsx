@@ -1,5 +1,6 @@
 // Text, dates, checkmarks and signatures placed on a page. Items can be
-// dragged (mouse or touch), resized, edited and deleted.
+// dragged (mouse or touch), resized and edited; font size, the calendar and
+// Delete are in the bar at the bottom (ActionBar).
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, type CSSProperties, type PointerEvent } from 'react';
 import type { PlacedItem } from '../pdf/model';
 import { TEXT_LINE_HEIGHT, TEXT_PADDING } from '../pdf/layout';
@@ -13,8 +14,6 @@ interface Props {
 }
 
 const DRAG_THRESHOLD_PX = 4;
-const MIN_FONT = 6;
-const MAX_FONT = 72;
 
 export const ItemLayer = memo(function ItemLayer({ page, scale, pageWidth, pageHeight }: Props) {
   const { state } = useEditor();
@@ -31,13 +30,12 @@ export const ItemLayer = memo(function ItemLayer({ page, scale, pageWidth, pageH
 
 function Item({ item, scale, pageWidth, pageHeight }: { item: PlacedItem; scale: number; pageWidth: number; pageHeight: number }) {
   const { state, dispatch } = useEditor();
-  const selected = state.selectedId === item.id;
+  const selected = state.selectedId === item.id || state.selectedItems.includes(item.id);
   const editing = state.editingId === item.id;
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; box: PlacedItem['box']; moved: boolean; id: number } | null>(null);
   const isText = item.kind === 'text' || item.kind === 'date';
   const isTypedSignature = item.kind === 'signature' && item.signature?.type === 'typed';
-  const hasFontSize = isText || isTypedSignature;
   const fontSize = item.fontSize ?? (isTypedSignature ? item.box.height * 0.6 : 12);
 
   const clampBox = (b: PlacedItem['box']) => ({
@@ -97,10 +95,7 @@ function Item({ item, scale, pageWidth, pageHeight }: { item: PlacedItem; scale:
       {isText && <EditableText item={item} scale={scale} fontSize={fontSize} editing={editing} />}
       {(item.kind === 'check' || item.kind === 'cross') && <Mark kind={item.kind} />}
       {item.kind === 'signature' && <SignatureView item={item} scale={scale} fontSize={fontSize} />}
-      {selected && state.canEdit && (
-        <ItemTools item={item} hasFontSize={hasFontSize} fontSize={fontSize} />
-      )}
-      {selected && state.canEdit && !isText && <ResizeHandle item={item} scale={scale} />}
+      {state.selectedId === item.id && state.canEdit && !isText && <ResizeHandle item={item} scale={scale} />}
     </div>
   );
 }
@@ -199,37 +194,6 @@ function SignatureView({ item, scale, fontSize }: { item: PlacedItem; scale: num
       style={{ fontSize: fontSize * scale, lineHeight: TEXT_LINE_HEIGHT, padding: TEXT_PADDING * scale }}
     >
       {sig.text}
-    </div>
-  );
-}
-
-function ItemTools({ item, hasFontSize, fontSize }: { item: PlacedItem; hasFontSize: boolean; fontSize: number }) {
-  const { dispatch } = useEditor();
-  const setSize = (size: number) =>
-    dispatch({ type: 'update-item', id: item.id, patch: { fontSize: Math.min(MAX_FONT, Math.max(MIN_FONT, size)) } });
-  // Keep the toolbar's own clicks from starting a drag or deselecting.
-  const stop = (e: PointerEvent) => e.stopPropagation();
-  return (
-    <div className="item-tools" onPointerDown={stop} role="toolbar" aria-label="Item tools">
-      {hasFontSize && (
-        <>
-          <button type="button" aria-label="Smaller text" onClick={() => setSize(Math.round(fontSize) - 2)} data-testid="item-smaller">
-            A−
-          </button>
-          <button type="button" aria-label="Larger text" onClick={() => setSize(Math.round(fontSize) + 2)} data-testid="item-larger">
-            A+
-          </button>
-        </>
-      )}
-      <button
-        type="button"
-        aria-label="Delete"
-        className="danger"
-        onClick={() => dispatch({ type: 'remove-item', id: item.id })}
-        data-testid="item-delete"
-      >
-        ✕
-      </button>
     </div>
   );
 }

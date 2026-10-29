@@ -50,9 +50,12 @@ export function PropertiesPanel({ pageSizes, onGoToPage }: Props) {
   const selectionKey = state.selection.join(',');
   const [toggled, setToggled] = useState<{ key: string; open: boolean } | null>(null);
   // On phones, checking suggestions happens on the page (keep/remove), so
-  // the sheet stays folded for them.
+  // the sheet stays folded for them. While adding fields or using Select,
+  // the sheet folds away on phones so the whole page can be tapped; the
+  // side panel on wider screens stays.
   const defaultOpen = (selected.length > 0 && !(narrow && onlySuggestions)) || !narrow;
-  const open = !state.buildTool && (toggled?.key === selectionKey ? toggled.open : defaultOpen);
+  const busy = narrow && (!!state.buildTool || state.lasso);
+  const open = !busy && (toggled?.key === selectionKey ? toggled.open : defaultOpen);
   const setOpen = (fn: (v: boolean) => boolean) => setToggled({ key: selectionKey, open: fn(open) });
 
   return (
@@ -497,7 +500,7 @@ function Check({ label, checked, onChange, testId }: { label: string; checked: b
 }
 
 function kindLabel(d: FieldDraft): string {
-  return { text: 'Text field', date: 'Date field', checkbox: 'Checkbox', radio: 'Radio button', dropdown: 'Dropdown', signature: 'Signature field', list: 'List box', button: 'Button' }[d.kind];
+  return { text: 'Text field', date: 'Date field', checkbox: 'Checkbox', radio: 'Choice (only one can be picked)', dropdown: 'Dropdown', signature: 'Signature field', list: 'List box', button: 'Button' }[d.kind];
 }
 
 const NARROW_QUERY = '(max-width: 720px)';
