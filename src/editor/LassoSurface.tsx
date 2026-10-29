@@ -10,6 +10,9 @@ const TAP_PX = 8;
 
 export function LassoSurface({ page, scale }: { page: number; scale: number }) {
   const { state, dispatch } = useEditor();
+  // The points live in a ref so lifting the finger always sees all of them,
+  // even when the screen hasn't caught up; state is only for drawing.
+  const points = useRef<Point[]>([]);
   const [loop, setLoop] = useState<Point[] | null>(null);
   const pointer = useRef<number | null>(null);
 
@@ -44,21 +47,24 @@ export function LassoSurface({ page, scale }: { page: number; scale: number }) {
           // Pointer already gone (e.g. a synthetic event); drawing still works.
         }
         pointer.current = e.pointerId;
-        setLoop([at(e)]);
+        points.current = [at(e)];
+        setLoop(points.current);
       }}
       onPointerMove={(e) => {
         if (pointer.current !== e.pointerId) return;
-        const p = at(e);
-        setLoop((l) => (l ? [...l, p] : [p]));
+        points.current = [...points.current, at(e)];
+        setLoop(points.current);
       }}
       onPointerUp={(e) => {
         if (pointer.current !== e.pointerId) return;
         pointer.current = null;
-        finish([...(loop ?? []), at(e)]);
+        finish([...points.current, at(e)]);
+        points.current = [];
         setLoop(null);
       }}
       onPointerCancel={() => {
         pointer.current = null;
+        points.current = [];
         setLoop(null);
       }}
     >

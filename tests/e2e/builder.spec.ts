@@ -278,11 +278,13 @@ test.describe('adding and removing many', () => {
     await editMode(page);
     await page.getByTestId('field-tool-checkbox').click();
     for (const x of [300, 322, 344]) await tapAt(page, x, 300);
-    await tapAt(page, 300, 400);
+    await tapAt(page, 300, 350);
     await page.getByTestId('tool-done').click();
 
     await page.getByTestId('field-tool-lasso').click();
     const boxes = page.locator('[data-testid="draft"][data-kind="checkbox"]');
+    // The loop must start on the page, not on the toolbar above it.
+    await boxes.nth(0).evaluate((el) => el.scrollIntoView({ block: 'center' }));
     const first = (await boxes.nth(0).boundingBox())!;
     const third = (await boxes.nth(2).boundingBox())!;
     await drawLoop(page, {

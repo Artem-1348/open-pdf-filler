@@ -294,6 +294,8 @@ test.describe('adding to any page (FR-4)', () => {
 
     await page.getByTestId('tool-lasso').click();
     const marks = page.locator('[data-kind="check"]');
+    // The loop must start on the page, not on the toolbar above it.
+    await marks.nth(0).evaluate((el) => el.scrollIntoView({ block: 'center' }));
     const first = (await marks.nth(0).boundingBox())!;
     const third = (await marks.nth(2).boundingBox())!;
     await drawLoop(page, {
