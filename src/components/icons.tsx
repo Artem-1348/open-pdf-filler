@@ -135,3 +135,14 @@ export const WandIcon = () => (
     <path d="M15 4v2M19 8h2M18 5l1.5-1.5M12 6l-1-1M18 11l1 1" />
   </svg>
 );
+export const LassoIcon = () => (
+  <svg {...base}>
+    <path d="M8.5 16.5C5 15.5 3 13.4 3 11c0-3.9 4-7 9-7s9 3.1 9 7-4 7-9 7c-1 0-2-.1-2.9-.3" strokeDasharray="3 2.5" />
+    <path d="M8.5 16.5c-.8 1.4-.5 3 .6 3.9" />
+  </svg>
+);
+export const TrashIcon = () => (
+  <svg {...base}>
+    <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" />
+  </svg>
+);

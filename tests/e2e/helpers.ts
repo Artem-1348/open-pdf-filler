@@ -97,3 +97,12 @@ export async function expectFieldText(field: Locator, value: string) {
 export async function usesInputBar(page: Page): Promise<boolean> {
   return page.evaluate(() => matchMedia('(pointer: coarse)').matches);
 }
+
+// Draws the Select tool's loop: an ellipse around a point, in page pixels.
+export async function drawLoop(page: Page, { x, y, rx, ry }: { x: number; y: number; rx: number; ry: number }) {
+  const at = (i: number) => ({ x: x + rx * Math.cos((i / 24) * 2 * Math.PI), y: y + ry * Math.sin((i / 24) * 2 * Math.PI) });
+  await page.mouse.move(at(0).x, at(0).y);
+  await page.mouse.down();
+  for (let i = 1; i <= 24; i++) await page.mouse.move(at(i).x, at(i).y);
+  await page.mouse.up();
+}

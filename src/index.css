@@ -642,17 +642,103 @@ select {
   white-space: nowrap;
 }
 
-/* "Stop" inside the floating progress pill. */
+/* Buttons inside the floating bar (Stop, Done, Delete…). */
 .hint-action {
   pointer-events: auto;
-  margin-left: 10px;
-  padding: 2px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 0 12px;
   border: 1px solid currentColor;
   border-radius: 999px;
   background: transparent;
   color: inherit;
   font: inherit;
+  font-weight: 600;
   cursor: pointer;
+}
+
+.hint-action svg {
+  width: 17px;
+  height: 17px;
+}
+
+.hint-action.primary {
+  border-color: transparent;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.hint-action.danger {
+  border-color: transparent;
+  background: #c62828;
+  color: #fff;
+}
+
+/* The bottom bar with buttons: one row, never wider than the screen. */
+.tool-hint.floating.action-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 16px;
+  pointer-events: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.date-pick {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Invisible, over the Calendar button: a tap opens the system calendar. */
+.date-pick-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 16px; /* stops iOS zooming in */
+}
+
+/* Select tool: drawing a loop over the page. */
+.lasso-surface {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.lasso-loop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.lasso-loop polygon {
+  fill: rgba(31, 95, 139, 0.12);
+  stroke: var(--draft-selected, #1f5f8b);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 720px) {
+  /* Above the folded Field properties sheet in Edit form. */
+  .tool-hint.floating.above-sheet {
+    bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+
+  /* With the sheet open, its own buttons (Accept, Delete…) take over. */
+  body:has(.props-panel:not(.collapsed)) .action-bar.selection {
+    display: none;
+  }
 }
 
 .fill-notice {
@@ -812,41 +898,6 @@ select.field-control {
 
 .item svg {
   display: block;
-}
-
-.item-tools {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 8px;
-  background: var(--text);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-  z-index: 5;
-  cursor: default;
-}
-
-.item-tools button {
-  min-width: 32px;
-  min-height: 32px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--bg);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.item-tools button:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.item-tools button.danger {
-  color: #ff9b9b;
 }
 
 .resize-handle {

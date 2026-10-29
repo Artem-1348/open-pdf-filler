@@ -2,7 +2,7 @@
 // Includes the gate: a 20-field form fills correctly and Tab walks the
 // fields in page order.
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { expectDocumentOpen, gotoApp, isMobile, openCorpusFile, typeInto, expectFieldText, usesInputBar } from './helpers';
+import { drawLoop, expectDocumentOpen, gotoApp, isMobile, openCorpusFile, typeInto, expectFieldText, usesInputBar } from './helpers';
 
 const draft = (page: Page, name: string) => page.locator(`[data-draft="${name}"]`);
 const field = (page: Page, name: string, widget = 0) => page.locator(`[data-field="${name}"]`).nth(widget);
@@ -14,13 +14,19 @@ async function editMode(page: Page, file = 'simple.pdf', pages = 1) {
   await page.getByTestId('mode-edit').click();
 }
 
-// Picks a field type and taps it onto page 1 at a spot given in points.
-async function addField(page: Page, kind: string, x: number, y: number) {
-  await page.getByTestId(`field-tool-${kind}`).click();
+// Taps the picked field type onto page 1 at a spot given in points.
+async function tapAt(page: Page, x: number, y: number) {
   const layer = page.locator('[data-page-index="0"] [data-testid="draft-layer"]');
   const box = (await layer.boundingBox())!;
   const scale = box.width / 612;
   await layer.click({ position: { x: x * scale, y: y * scale } });
+}
+
+// Picks a field type, taps it onto page 1, and puts the tool down (Done).
+async function addField(page: Page, kind: string, x: number, y: number) {
+  await page.getByTestId(`field-tool-${kind}`).click();
+  await tapAt(page, x, y);
+  await page.getByTestId('tool-done').click();
 }
 
 async function rename(page: Page, name: string) {
@@ -246,6 +252,54 @@ test.describe('building', () => {
   });
 });
 
+test.describe('adding and removing many', () => {
+  test('choices tapped in a row are one question; several fields in a row', async ({ page }) => {
+    await editMode(page);
+    await page.getByTestId('field-tool-radio').click();
+    await expect(page.getByTestId('tool-hint')).toContainText('Only one can be picked');
+    for (const y of [300, 330, 360]) await tapAt(page, 100, y);
+    await expect(page.locator('[data-testid="draft"][data-kind="radio"][data-draft="Choice 1"]')).toHaveCount(3);
+    await page.getByTestId('tool-done').click();
+
+    await page.getByTestId('field-tool-checkbox').click();
+    for (const x of [300, 330, 360]) await tapAt(page, x, 300);
+    await page.getByTestId('tool-done').click();
+    await expect(page.locator('[data-testid="draft"][data-kind="checkbox"]')).toHaveCount(3);
+
+    // Fill mode: picking one choice clears the others.
+    await page.getByTestId('mode-fill').click();
+    await field(page, 'Choice 1', 1).click();
+    await expect(field(page, 'Choice 1', 1)).toHaveAttribute('aria-checked', 'true');
+    await field(page, 'Choice 1', 2).click();
+    await expect(field(page, 'Choice 1', 1)).toHaveAttribute('aria-checked', 'false');
+  });
+
+  test('Select: a loop around fields deletes them together', async ({ page }) => {
+    await editMode(page);
+    await page.getByTestId('field-tool-checkbox').click();
+    for (const x of [300, 322, 344]) await tapAt(page, x, 300);
+    await tapAt(page, 300, 350);
+    await page.getByTestId('tool-done').click();
+
+    await page.getByTestId('field-tool-lasso').click();
+    const boxes = page.locator('[data-testid="draft"][data-kind="checkbox"]');
+    // The loop must start on the page, not on the toolbar above it.
+    await boxes.nth(0).evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    const first = (await boxes.nth(0).boundingBox())!;
+    const third = (await boxes.nth(2).boundingBox())!;
+    await drawLoop(page, {
+      x: (first.x + third.x + third.width) / 2,
+      y: first.y + first.height / 2,
+      rx: (third.x + third.width - first.x) / 2 + 10,
+      ry: first.height + 4,
+    });
+    await expect(page.getByTestId('selection-bar')).toContainText('3 fields');
+    await page.getByTestId('selection-delete').click();
+    await expect(boxes).toHaveCount(1);
+    await page.getByTestId('lasso-done').click();
+  });
+});
+
 test.describe('editing an existing form', () => {
   test('fields in a PDF can be moved, renamed and deleted', async ({ page }, testInfo) => {
     await editMode(page, 'fillable-form.pdf');
@@ -286,7 +340,7 @@ test.describe('phone layout', () => {
       const b = (await page.getByTestId(id).boundingBox())!;
       expect(b.x + b.width, id).toBeLessThanOrEqual(width);
     }
-    for (const kind of ['text', 'date', 'checkbox', 'radio', 'dropdown', 'signature']) {
+    for (const kind of ['text', 'date', 'checkbox', 'radio', 'dropdown', 'signature', 'lasso']) {
       await page.getByTestId(`field-tool-${kind}`).scrollIntoViewIfNeeded();
       await expect(page.getByTestId(`field-tool-${kind}`)).toBeInViewport();
     }

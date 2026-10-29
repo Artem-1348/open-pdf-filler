@@ -536,7 +536,8 @@ export default function App() {
         const selected = (editor.drafts ?? []).filter((d) => editor.selection.includes(d.id));
         if (e.key === 'Escape') {
           if (editor.buildTool) dispatch({ type: 'set-build-tool', tool: null });
-          else dispatch({ type: 'select-drafts', ids: [] });
+          else if (editor.selection.length) dispatch({ type: 'select-drafts', ids: [] });
+          else if (editor.lasso) dispatch({ type: 'set-lasso', on: false });
         } else if ((e.key === 'Delete' || e.key === 'Backspace') && selected.length) {
           e.preventDefault();
           dispatch({ type: 'remove-drafts', ids: selected.map((d) => d.id) });
@@ -563,19 +564,20 @@ export default function App() {
       }
       if (e.key === 'Escape') {
         if (editor.tool) dispatch({ type: 'set-tool', tool: null });
-        else if (editor.selectedId) dispatch({ type: 'select', id: null });
-      } else if ((e.key === 'Delete' || e.key === 'Backspace') && editor.selectedId) {
+        else if (editor.selectedId || editor.selectedItems.length) dispatch({ type: 'select', id: null });
+        else if (editor.lasso) dispatch({ type: 'set-lasso', on: false });
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && (editor.selectedId || editor.selectedItems.length)) {
         e.preventDefault();
-        dispatch({ type: 'remove-item', id: editor.selectedId });
+        dispatch({ type: 'remove-items', ids: editor.selectedId ? [editor.selectedId] : editor.selectedItems });
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [editor.tool, editor.selectedId, editor.mode, editor.drafts, editor.selection, editor.buildTool, doc]);
+  }, [editor.tool, editor.selectedId, editor.selectedItems, editor.lasso, editor.mode, editor.drafts, editor.selection, editor.buildTool, doc]);
 
   const onBackgroundPointerDown = useCallback(() => {
-    if (editor.selectedId && !editor.editingId) dispatch({ type: 'select', id: null });
-  }, [editor.selectedId, editor.editingId]);
+    if ((editor.selectedId && !editor.editingId) || editor.selectedItems.length) dispatch({ type: 'select', id: null });
+  }, [editor.selectedId, editor.editingId, editor.selectedItems]);
 
   const onNarrowSelect = (index: number) => {
     goToPage(index);

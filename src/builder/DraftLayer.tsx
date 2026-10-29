@@ -3,7 +3,7 @@
 import { memo, useRef, type PointerEvent } from 'react';
 import { useEditor } from '../editor/EditorContext';
 import { visibleSuggestions, type Suggestion } from '../editor/state';
-import { clampToPage, newDraft, type FieldDraft } from './model';
+import { clampToPage, newDraft, nextRadioOption, type FieldDraft } from './model';
 
 interface Props {
   page: number;
@@ -20,7 +20,7 @@ const KIND_LABEL: Record<FieldDraft['kind'], string> = {
   text: 'Text',
   date: 'Date',
   checkbox: 'Checkbox',
-  radio: 'Radio',
+  radio: 'Choice',
   dropdown: 'Dropdown',
   signature: 'Signature',
   list: 'List',
@@ -34,6 +34,7 @@ export const DraftLayer = memo(function DraftLayer({ page, scale, pageWidth, pag
   const pageSize = { width: pageWidth, height: pageHeight };
 
   // Tap on the page: place the picked field type, or clear the selection.
+  // The type stays picked, so several can be added in a row.
   const onSurfaceDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 || e.target !== e.currentTarget) return;
     if (!state.buildTool) {
@@ -43,7 +44,15 @@ export const DraftLayer = memo(function DraftLayer({ page, scale, pageWidth, pag
     e.preventDefault();
     const r = e.currentTarget.getBoundingClientRect();
     const at = { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale };
-    dispatch({ type: 'add-drafts', drafts: [newDraft(state.buildTool, page, at, state.drafts ?? [], pageSize)] });
+    const all = state.drafts ?? [];
+    let draft = newDraft(state.buildTool, page, at, all, pageSize);
+    // Choice buttons tapped in a row are one question: another option of
+    // the one just added, so only one of them can be picked.
+    const last = state.selection.length === 1 ? all.find((d) => d.id === state.selection[0]) : undefined;
+    if (state.buildTool === 'radio' && last?.kind === 'radio' && !last.source && last.page === page) {
+      draft = { ...nextRadioOption(last, all, pageSize), box: draft.box };
+    }
+    dispatch({ type: 'add-drafts', drafts: [draft], keepTool: true });
   };
 
   return (
@@ -178,38 +187,8 @@ function DraftBox({
           {Math.round(suggestion.confidence * 100)}
         </span>
       )}
-      {selected && state.selection.length === 1 && <ResizeHandle draft={draft} scale={scale} pageSize={pageSize} />}
-      {selected && suggestion && state.selection.length === 1 && <SuggestionTools suggestion={suggestion} />}
-    </div>
-  );
-}
-
-// Keep or remove a suggestion right on the page, then move on to the next
-// one, so a form can be checked box by box.
-function SuggestionTools({ suggestion }: { suggestion: Suggestion }) {
-  const { state, dispatch } = useEditor();
-  const next = () => {
-    const list = visibleSuggestions(state)
-      .filter((d) => d.id !== suggestion.id)
-      .sort((a, b) => a.page - b.page || a.box.y - b.box.y || a.box.x - b.box.x);
-    const after = list.find(
-      (d) => d.page === suggestion.page && (d.box.y > suggestion.box.y + 2 || (Math.abs(d.box.y - suggestion.box.y) <= 2 && d.box.x > suggestion.box.x)),
-    );
-    return after ? [after.id] : [];
-  };
-  const act = (type: 'accept-suggestions' | 'reject-suggestions') => {
-    const following = next();
-    dispatch({ type, ids: [suggestion.id] });
-    dispatch({ type: 'select-drafts', ids: following });
-  };
-  return (
-    <div className="item-tools suggestion-tools" role="toolbar" aria-label="Check this suggestion" onPointerDown={(e) => e.stopPropagation()}>
-      <button type="button" aria-label="Keep this field" title="Keep" onClick={() => act('accept-suggestions')} data-testid="keep-suggestion">
-        ✓
-      </button>
-      <button type="button" className="danger" aria-label="Remove this suggestion" title="Remove" onClick={() => act('reject-suggestions')} data-testid="remove-suggestion">
-        ✕
-      </button>
+      {/* Not while adding fields in a row: the handle would catch the next tap. */}
+      {selected && state.selection.length === 1 && !state.buildTool && <ResizeHandle draft={draft} scale={scale} pageSize={pageSize} />}
     </div>
   );
 }

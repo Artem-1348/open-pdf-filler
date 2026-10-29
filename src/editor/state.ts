@@ -56,6 +56,13 @@ export interface EditorState {
   // Item that should take keyboard focus for typing right after placement.
   editingId: string | null;
   tool: Tool | null;
+  // Items placed since the tool was picked: a tool stays on so several can
+  // be placed in a row, and Done then starts typing in the first empty one.
+  placedRun: string[];
+  // Several placed items picked with the lasso (Fill mode).
+  selectedItems: string[];
+  // Select tool: draw a loop around things to select them (both modes).
+  lasso: boolean;
   // Edit form mode.
   selection: string[];
   // Auto-detect suggestions, and the confidence below which they're hidden.
@@ -91,13 +98,17 @@ export type EditorAction =
   | { type: 'place'; item: PlacedItem }
   | { type: 'update-item'; id: string; patch: Partial<Omit<PlacedItem, 'id'>> }
   | { type: 'remove-item'; id: string }
+  | { type: 'remove-items'; ids: string[] }
+  | { type: 'select-items'; ids: string[] }
+  | { type: 'set-lasso'; on: boolean }
   | { type: 'select'; id: string | null }
   | { type: 'edit'; id: string }
   | { type: 'stop-editing' }
   | { type: 'set-tool'; tool: Tool | null }
   | { type: 'set-mode'; mode: Mode }
   | { type: 'set-build-tool'; tool: CreatableKind | null }
-  | { type: 'add-drafts'; drafts: FieldDraft[] }
+  // `keepTool`: the field type stays picked, to add more in a row.
+  | { type: 'add-drafts'; drafts: FieldDraft[]; keepTool?: boolean }
   // `key` groups a run of updates (e.g. one drag) into one undo step.
   | { type: 'update-drafts'; patches: Array<{ id: string; patch: DraftPatch }>; key?: string }
   | { type: 'remove-drafts'; ids: string[] }
@@ -125,6 +136,9 @@ export const emptyEditor: EditorState = {
   selectedId: null,
   editingId: null,
   tool: null,
+  placedRun: [],
+  selectedItems: [],
+  lasso: false,
   selection: [],
   suggestions: [],
   minConfidence: 0.5,
@@ -166,6 +180,7 @@ function restore(state: EditorState, snap: Snapshot): EditorState {
     ...next,
     selection: state.selection.filter((id) => ids.has(id)),
     selectedId: state.selectedId && itemIds.has(state.selectedId) ? state.selectedId : null,
+    selectedItems: state.selectedItems.filter((id) => itemIds.has(id)),
     editingId: null,
     lastKey: null,
   };
@@ -243,13 +258,15 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return { ...state, ...record(state, `value:${action.name}`), values };
     }
     case 'place':
+      // The tool stays on; nothing is selected until the run is done.
       return {
         ...state,
         ...record(state, null),
         items: [...state.items, action.item],
-        selectedId: action.item.id,
-        editingId: action.item.kind === 'text' ? action.item.id : null,
-        tool: null,
+        selectedId: null,
+        selectedItems: [],
+        editingId: null,
+        placedRun: [...state.placedRun, action.item.id],
       };
     case 'update-item':
       return {
@@ -258,28 +275,69 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         items: state.items.map((i) => (i.id === action.id ? { ...i, ...action.patch } : i)),
       };
     case 'remove-item':
+      return editorReducer(state, { type: 'remove-items', ids: [action.id] });
+    case 'remove-items': {
+      const gone = new Set(action.ids);
+      if (!state.items.some((i) => gone.has(i.id))) return state;
       return {
         ...state,
         ...record(state, null),
-        items: state.items.filter((i) => i.id !== action.id),
-        selectedId: state.selectedId === action.id ? null : state.selectedId,
-        editingId: state.editingId === action.id ? null : state.editingId,
+        items: state.items.filter((i) => !gone.has(i.id)),
+        selectedId: state.selectedId && gone.has(state.selectedId) ? null : state.selectedId,
+        selectedItems: state.selectedItems.filter((id) => !gone.has(id)),
+        editingId: state.editingId && gone.has(state.editingId) ? null : state.editingId,
       };
+    }
     case 'select':
       return {
         ...state,
         selectedId: action.id,
+        selectedItems: [],
         editingId: action.id === state.editingId ? state.editingId : null,
         lastKey: null,
+      };
+    case 'select-items':
+      // One item gets the usual single selection (handles, font size).
+      return action.ids.length === 1
+        ? { ...state, selectedId: action.ids[0], selectedItems: [], editingId: null, lastKey: null }
+        : { ...state, selectedId: null, selectedItems: action.ids, editingId: null, lastKey: null };
+    case 'set-lasso':
+      return {
+        ...state,
+        lasso: action.on,
+        tool: null,
+        buildTool: null,
+        placedRun: [],
+        editingId: null,
+        ...(action.on ? {} : { selectedItems: [] }),
       };
     case 'edit':
       return { ...state, selectedId: action.id, editingId: action.id };
     case 'stop-editing':
       return { ...state, editingId: null, lastKey: null };
-    case 'set-tool':
-      return { ...state, tool: action.tool, selectedId: action.tool ? null : state.selectedId };
+    case 'set-tool': {
+      const base = { ...state, tool: action.tool, placedRun: [], lasso: false, selectedItems: [] };
+      if (action.tool) return { ...base, selectedId: null, editingId: null };
+      // Done with text boxes: start typing in the first one still empty.
+      const firstEmpty =
+        state.tool?.kind === 'text'
+          ? state.placedRun.map((id) => state.items.find((i) => i.id === id)).find((i) => i?.kind === 'text' && !i.text)
+          : undefined;
+      return firstEmpty ? { ...base, selectedId: firstEmpty.id, editingId: firstEmpty.id } : base;
+    }
     case 'set-mode': {
-      const base = { ...state, mode: action.mode, tool: null, buildTool: null, selection: [], selectedId: null, editingId: null };
+      const base = {
+        ...state,
+        mode: action.mode,
+        tool: null,
+        buildTool: null,
+        lasso: false,
+        placedRun: [],
+        selection: [],
+        selectedItems: [],
+        selectedId: null,
+        editingId: null,
+      };
       if (action.mode === 'edit' && !state.drafts) {
         // Entering Edit form turns the PDF's fields into drafts; this alone
         // is not a change to the document.
@@ -293,11 +351,11 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return base;
     }
     case 'set-build-tool':
-      return { ...state, buildTool: action.tool, selection: action.tool ? [] : state.selection };
+      return { ...state, buildTool: action.tool, lasso: action.tool ? false : state.lasso, selection: action.tool ? [] : state.selection };
     case 'add-drafts': {
       const drafts = [...(state.drafts ?? []), ...action.drafts];
       const next = withDrafts({ ...state, ...record(state, null) }, drafts);
-      return { ...next, selection: action.drafts.map((d) => d.id), buildTool: null };
+      return { ...next, selection: action.drafts.map((d) => d.id), buildTool: action.keepTool ? state.buildTool : null };
     }
     case 'update-drafts': {
       if (!state.drafts) return state;
@@ -469,4 +527,27 @@ export function structureChanges(state: EditorState) {
 // Suggestions shown with the current confidence filter.
 export function visibleSuggestions(state: EditorState): Suggestion[] {
   return state.suggestions.filter((d) => d.confidence >= state.minConfidence);
+}
+
+// Placed dates use the same short format as todayText; the calendar picker
+// speaks ISO (YYYY-MM-DD). Text that isn't a whole date gives ''.
+export function dateTextToIso(text: string, locale?: string): string {
+  const order = new Intl.DateTimeFormat(locale, { year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(new Date(2001, 10, 22))
+    .map((p) => p.type)
+    .filter((t) => t === 'year' || t === 'month' || t === 'day');
+  const nums = text.match(/\d+/g);
+  if (!nums || nums.length !== 3 || order.length !== 3) return '';
+  const parts: Record<string, string> = {};
+  order.forEach((t, i) => (parts[t] = nums[i]));
+  const { year: y, month: m, day: d } = parts;
+  if (!/^\d{4}$/.test(y) || !/^\d{1,2}$/.test(m) || !/^\d{1,2}$/.test(d)) return '';
+  const date = new Date(Number(y), Number(m) - 1, Number(d));
+  if (date.getFullYear() !== Number(y) || date.getMonth() !== Number(m) - 1 || date.getDate() !== Number(d)) return '';
+  return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+}
+
+export function isoToDateText(iso: string, locale?: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return m ? todayText(new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])), locale) : '';
 }
